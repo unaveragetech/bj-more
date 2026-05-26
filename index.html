@@ -1,0 +1,381 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Blackjack Lab Mini Client</title>
+    <style>
+      * {
+        box-sizing: border-box;
+      }
+
+      body {
+        margin: 0;
+        min-height: 100vh;
+        display: block;
+        background:
+          linear-gradient(120deg, rgba(16, 24, 32, 0.94), rgba(25, 48, 55, 0.88)),
+          radial-gradient(circle at 82% 12%, rgba(250, 204, 21, 0.2), transparent 30%),
+          #101820;
+        color: #f8fafc;
+        font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      }
+
+      a {
+        color: inherit;
+      }
+
+      strong {
+        font-weight: 800;
+      }
+
+      .page-shell {
+        min-height: 100vh;
+        display: grid;
+        grid-template-columns: minmax(260px, 0.9fr) minmax(320px, 1.1fr);
+      }
+
+      .hero {
+        padding: clamp(32px, 6vw, 72px);
+        display: flex;
+        flex-direction: column;
+        justify-content: space-between;
+        gap: 40px;
+      }
+
+      .brand-mark {
+        display: inline-flex;
+        align-items: center;
+        gap: 12px;
+        color: #f8fafc;
+        font-weight: 800;
+      }
+
+      .brand-mark span {
+        display: grid;
+        place-items: center;
+        width: 46px;
+        height: 46px;
+        border: 1px solid rgba(255, 255, 255, 0.24);
+        background: rgba(250, 204, 21, 0.16);
+        color: #facc15;
+        border-radius: 8px;
+      }
+
+      h1 {
+        max-width: 760px;
+        margin: 0;
+        font-size: clamp(44px, 8vw, 92px);
+        line-height: 0.92;
+        letter-spacing: 0;
+      }
+
+      .lead {
+        max-width: 680px;
+        color: #dbeafe;
+        font-size: clamp(17px, 2.2vw, 23px);
+        line-height: 1.45;
+      }
+
+      .launch-panel {
+        align-self: stretch;
+        display: flex;
+        flex-direction: column;
+        justify-content: center;
+        gap: 18px;
+        padding: clamp(24px, 5vw, 64px);
+        background: rgba(5, 10, 18, 0.5);
+        border-left: 1px solid rgba(255, 255, 255, 0.12);
+      }
+
+      .status-box {
+        border: 1px solid rgba(255, 255, 255, 0.16);
+        background: rgba(15, 23, 42, 0.74);
+        border-radius: 8px;
+        padding: 18px;
+      }
+
+      .status-line {
+        display: flex;
+        justify-content: space-between;
+        gap: 16px;
+        margin: 10px 0;
+        color: #cbd5e1;
+      }
+
+      .status-line strong {
+        color: #f8fafc;
+        word-break: break-all;
+      }
+
+      label {
+        display: grid;
+        gap: 8px;
+        color: #cbd5e1;
+        font-weight: 700;
+      }
+
+      input {
+        width: 100%;
+        border: 1px solid rgba(255, 255, 255, 0.18);
+        border-radius: 8px;
+        padding: 12px 14px;
+        background: rgba(15, 23, 42, 0.9);
+        color: #f8fafc;
+        font: inherit;
+      }
+
+      .actions {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 12px;
+      }
+
+      .primary-link,
+      button {
+        border: 0;
+        border-radius: 8px;
+        padding: 12px 16px;
+        background: #facc15;
+        color: #101820;
+        font: inherit;
+        font-weight: 800;
+        cursor: pointer;
+        text-decoration: none;
+      }
+
+      button.secondary {
+        background: rgba(255, 255, 255, 0.12);
+        color: #f8fafc;
+      }
+
+      .feature-grid {
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 14px;
+      }
+
+      .info-stack {
+        display: grid;
+        gap: 14px;
+      }
+
+      .feature {
+        border-top: 1px solid rgba(255, 255, 255, 0.16);
+        padding-top: 12px;
+        color: #cbd5e1;
+      }
+
+      .feature strong {
+        display: block;
+        color: #f8fafc;
+        margin-bottom: 5px;
+      }
+
+      .guide-card {
+        border: 1px solid rgba(255, 255, 255, 0.16);
+        background: rgba(15, 23, 42, 0.62);
+        border-radius: 8px;
+        padding: 16px;
+      }
+
+      .guide-card h2,
+      .guide-card h3 {
+        margin: 0 0 10px;
+        letter-spacing: 0;
+      }
+
+      .guide-card p {
+        margin: 0;
+        color: #cbd5e1;
+        line-height: 1.5;
+      }
+
+      .step-list {
+        margin: 0;
+        padding-left: 22px;
+        color: #dbeafe;
+        line-height: 1.55;
+      }
+
+      .step-list li + li {
+        margin-top: 7px;
+      }
+
+      .connection-map {
+        display: grid;
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+        gap: 8px;
+        margin-top: 12px;
+      }
+
+      .connection-map div {
+        border: 1px solid rgba(250, 204, 21, 0.24);
+        border-radius: 8px;
+        padding: 10px;
+        background: rgba(250, 204, 21, 0.08);
+        color: #f8fafc;
+        min-height: 72px;
+      }
+
+      .connection-map span {
+        display: block;
+        color: #facc15;
+        font-weight: 800;
+        margin-bottom: 4px;
+      }
+
+      .fine {
+        color: #94a3b8;
+        font-size: 13px;
+        line-height: 1.5;
+      }
+
+      @media (max-width: 820px) {
+        .page-shell {
+          grid-template-columns: 1fr;
+        }
+
+        .launch-panel {
+          border-left: 0;
+          border-top: 1px solid rgba(255, 255, 255, 0.12);
+        }
+
+        .connection-map {
+          grid-template-columns: 1fr;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <div class="page-shell">
+      <section class="hero">
+        <div class="brand-mark"><span>21</span> Blackjack Lab</div>
+        <div>
+          <h1>Mini Casino Client</h1>
+          <p class="lead">A public browser entry point for Blackjack Lab. Check the live connection, choose a player name, and enter the multiplayer slots floor without downloading the private server package.</p>
+        </div>
+        <div class="feature-grid">
+          <div class="feature"><strong>Multiplayer Slots</strong> Walk the generated casino floor, see other players, emote, inspect cabinets, and sit at games.</div>
+          <div class="feature"><strong>Blackjack Table</strong> Practice, learn strategy, and jump from table areas on the floor into blackjack play.</div>
+          <div class="feature"><strong>Public Safe</strong> This repo ships only browser code. Server tokens and host config stay private.</div>
+          <div class="feature"><strong>Live Connection</strong> Reads a connection manifest published by the host server at startup.</div>
+        </div>
+      </section>
+
+      <section class="launch-panel">
+        <div class="info-stack">
+          <div class="guide-card">
+            <h2>Connect And Play</h2>
+            <ol class="step-list">
+              <li>Wait for the connection status to show the current server.</li>
+              <li>Enter the name other players should see.</li>
+              <li>Click <strong>Enter Casino</strong> to open directly into Slots multiplayer.</li>
+            </ol>
+          </div>
+
+          <div class="guide-card">
+            <h3>How The Connection Works</h3>
+            <p>The private host server publishes a tiny public <strong>connection.json</strong>. This page reads that file, finds the latest WebSocket server URL, and passes it to the game client.</p>
+            <div class="connection-map">
+              <div><span>1. Host</span>Runs the server and updates the manifest.</div>
+              <div><span>2. Manifest</span>Stores only status, updated time, and wsUrl.</div>
+              <div><span>3. Player</span>Launches the game already connected.</div>
+            </div>
+          </div>
+
+          <div class="guide-card">
+            <h3>Where Multiplayer Matters</h3>
+            <p>Multiplayer presence is centered on the slots floor: players see each other walking around, emote, gather near cabinets, and move between slot machines and blackjack table areas. Shared blackjack rooms are available from the Multiplayer tab.</p>
+          </div>
+        </div>
+
+        <div class="status-box">
+          <div class="status-line"><span>Status</span><strong id="manifestStatus">Checking manifest...</strong></div>
+          <div class="status-line"><span>Server</span><strong id="serverUrl">Waiting</strong></div>
+          <div class="status-line"><span>Updated</span><strong id="updatedAt">Unknown</strong></div>
+        </div>
+
+        <label>
+          Player name
+          <input id="playerName" maxlength="32" value="Player">
+        </label>
+
+        <label>
+          Connection manifest URL
+          <input id="manifestUrl" placeholder="https://host.github.io/connection-repo/connection.json">
+        </label>
+
+        <div class="actions">
+          <a id="launchLink" class="primary-link" href="./play.html?view=slots">Enter Casino</a>
+          <button id="refreshManifest" class="secondary" type="button">Refresh</button>
+          <button id="saveManifest" class="secondary" type="button">Save Manifest</button>
+        </div>
+
+        <p class="fine">Use ?manifest=https://.../connection.json to preconfigure this page. If no manifest is set, it tries ./connection.json, which is useful when the mini client and connection repo are published together for testing.</p>
+      </section>
+    </div>
+
+    <script src="./connection-settings.js"></script>
+    <script>
+      const params = new URLSearchParams(location.search);
+      const manifestInput = document.querySelector("#manifestUrl");
+      const playerInput = document.querySelector("#playerName");
+      const statusEl = document.querySelector("#manifestStatus");
+      const serverEl = document.querySelector("#serverUrl");
+      const updatedEl = document.querySelector("#updatedAt");
+      const launchLink = document.querySelector("#launchLink");
+
+      function savedManifestUrl() {
+        return params.get("manifest") || window.BLACKJACK_CONNECTION_MANIFEST_URL || localStorage.getItem("blackjack_manifest_url") || "./connection.json";
+      }
+
+      function safeName() {
+        return (playerInput.value || "Player").replace(/[^\w -]/g, "").trim().slice(0, 32) || "Player";
+      }
+
+      function setLaunch(wsUrl) {
+        const url = new URL("./play.html", location.href);
+        url.searchParams.set("view", "slots");
+        url.searchParams.set("mpServer", wsUrl);
+        url.searchParams.set("mpName", safeName());
+        url.searchParams.set("v", Date.now().toString());
+        launchLink.href = url.toString();
+      }
+
+      async function loadManifest() {
+        const manifestUrl = manifestInput.value.trim() || savedManifestUrl();
+        manifestInput.value = manifestUrl;
+        statusEl.textContent = "Checking...";
+        try {
+          const response = await fetch(manifestUrl, { cache: "no-store" });
+          if (!response.ok) throw new Error(`HTTP ${response.status}`);
+          const manifest = await response.json();
+          if (!manifest.wsUrl) throw new Error("wsUrl missing");
+          statusEl.textContent = manifest.status || "online";
+          serverEl.textContent = manifest.wsUrl;
+          updatedEl.textContent = manifest.updatedAt || "Unknown";
+          setLaunch(manifest.wsUrl);
+        } catch (error) {
+          statusEl.textContent = "Manifest unavailable";
+          serverEl.textContent = "Set a valid connection.json URL";
+          updatedEl.textContent = error.message || "Unknown error";
+          setLaunch("ws://localhost:9000");
+        }
+      }
+
+      document.querySelector("#refreshManifest").addEventListener("click", loadManifest);
+      document.querySelector("#saveManifest").addEventListener("click", () => {
+        localStorage.setItem("blackjack_manifest_url", manifestInput.value.trim());
+        loadManifest();
+      });
+      playerInput.addEventListener("input", () => {
+        const server = serverEl.textContent;
+        if (server.startsWith("ws")) setLaunch(server);
+      });
+
+      manifestInput.value = savedManifestUrl();
+      loadManifest();
+    </script>
+  </body>
+</html>
