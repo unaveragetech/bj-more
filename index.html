@@ -6,24 +6,33 @@
     <title>Blackjack Lab Connection</title>
     <style>
       body { margin: 0; min-height: 100vh; display: grid; place-items: center; background: #101820; color: #f8fafc; font-family: Arial, sans-serif; }
-      main { width: min(720px, calc(100% - 32px)); border: 1px solid rgba(255,255,255,0.18); border-radius: 12px; padding: 24px; background: rgba(15,23,42,0.84); }
-      code { color: #facc15; word-break: break-all; }
+      main { width: min(720px, calc(100% - 32px)); border: 1px solid rgba(255,255,255,0.18); border-radius: 12px; padding: 24px; background: rgba(15,23,42,0.84); box-shadow: 0 24px 80px rgba(0,0,0,0.35); }
+      h1 { margin: 0 0 8px; font-size: 28px; }
+      dl { display: grid; grid-template-columns: 150px 1fr; gap: 10px 16px; margin: 20px 0 0; }
+      dt { color: #94a3b8; }
+      dd { margin: 0; word-break: break-all; }
+      code { color: #facc15; }
     </style>
   </head>
   <body>
     <main>
       <h1>Blackjack Lab Connection</h1>
-      <p>This starter repo is updated by the running multiplayer server.</p>
-      <p>Current WebSocket: <code>ws://localhost:9000</code></p>
+      <p>Mini clients read this page or <code>connection.json</code> to find the current multiplayer server.</p>
+      <dl>
+        <dt>Status</dt><dd>online</dd>
+        <dt>WebSocket</dt><dd><code>ws://localhost:9000</code></dd>
+        <dt>Public URL</dt><dd><code>local only</code></dd>
+        <dt>Updated</dt><dd>2026-05-26T19:51:48.997Z</dd>
+      </dl>
       <script id="connection-info" type="application/json">{
   "app": "blackjack-lab",
-  "status": "offline",
+  "status": "online",
   "httpUrl": "",
   "wsUrl": "ws://localhost:9000",
   "localWsUrl": "ws://localhost:9000",
   "port": 9000,
-  "source": "template",
-  "updatedAt": "1970-01-01T00:00:00.000Z"
+  "source": "local",
+  "updatedAt": "2026-05-26T19:51:48.997Z"
 }</script>
     </main>
   </body>
