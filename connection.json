@@ -5,6 +5,6 @@
   "wsUrl": "ws://localhost:9000",
   "localWsUrl": "ws://localhost:9000",
   "port": 9000,
-  "source": "local",
-  "updatedAt": "2026-05-26T19:51:48.997Z"
+  "source": "ngrok-manual",
+  "updatedAt": "2026-05-26T19:52:48.117Z"
 }
