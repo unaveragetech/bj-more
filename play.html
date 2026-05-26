@@ -1,0 +1,43 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Blackjack Lab</title>
+    <link rel="stylesheet" href="./src/styles.css?v=2" />
+  </head>
+  <body>
+    <aside class="rail">
+      <div class="brand">
+        <span>21</span>
+        <div>
+          <strong>Blackjack Lab</strong>
+          <small>Local HTML/JS/CSS app</small>
+        </div>
+      </div>
+      <nav>
+        <button data-view="table" class="active">Table</button>
+        <button data-view="multiplayer">Multiplayer</button>
+        <button data-view="auto">Auto Lab</button>
+        <button data-view="slots">Slots</button>
+        <button data-view="keno">Keno</button>
+        <button data-view="bank">Bank</button>
+        <button data-view="drinks">Drink Server</button>
+        <button data-view="rules">Rules</button>
+        <button data-view="history">History</button>
+        <button data-view="strategy">Strategy</button>
+      </nav>
+      <div class="rail-card">
+        <small>Bankroll</small>
+        <strong id="bankrollLabel">0</strong>
+      </div>
+      <button id="resetAll" class="ghost">Reset Lab</button>
+    </aside>
+
+    <main>
+      <section id="app"></section>
+    </main>
+
+    <script type="module" src="./src/app.js?v=59"></script>
+  </body>
+</html>
