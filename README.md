@@ -1,81 +1,83 @@
 # Blackjack Lab Mini Client
 
-This is the public mini client for Blackjack Lab. It is meant for players: open the page, confirm the server connection, choose a name, and enter the multiplayer casino.
+Blackjack Lab is a browser casino playground with a multiplayer slots floor, blackjack tables, keno, player avatars, emotes, bankroll systems, and host surveillance. This repository is the public mini client: it contains only static browser files that players can open from GitHub Pages or download locally.
 
-The host/server code is not in this repo. The host runs the private multiplayer server and publishes a tiny public connection manifest so players can always find the current WebSocket URL.
+The private host server is not published here. The host runs the multiplayer server locally, opens an ngrok tunnel, and publishes a tiny connection manifest so players always know where to connect.
 
-## Quick Start For Players
+## Play From GitHub Pages
 
-1. Open the GitHub Pages site for this repo.
-2. Check the **Connection** panel.
-3. If the status says `online` and the server shows a `ws://` or `wss://` URL, enter your player name.
+1. Open the GitHub Pages site: <https://unaveragetech.github.io/bj-more/>
+2. Wait for the Connection panel to show `online` and a `wss://...ngrok-free.app` server.
+3. Enter the player name other people should see.
 4. Click **Enter Casino**.
-5. The game opens directly into the Slots floor with multiplayer enabled.
 
-If the page says `Manifest unavailable`, paste the connection manifest URL from the host into **Connection manifest URL**, click **Save Manifest**, then click **Enter Casino**.
+The page launches `play.html` directly into the multiplayer slots floor with the current server URL already attached.
 
-## What The Connection Manifest Is
+## How Connection Works
 
-The host publishes a separate minimal repo or page containing only:
+The host publishes a separate branch named `connection` containing only:
 
 - `connection.json`
 - `index.html`
 
-`connection.json` looks like this:
+The mini client reads:
+
+```text
+https://raw.githubusercontent.com/unaveragetech/bj-more/connection/connection.json
+```
+
+Expected manifest shape:
 
 ```json
 {
+  "app": "blackjack-lab",
   "status": "online",
+  "httpUrl": "https://example.ngrok-free.app",
   "wsUrl": "wss://example.ngrok-free.app",
-  "updatedAt": "2026-05-26T18:00:00.000Z"
+  "localWsUrl": "ws://localhost:9000",
+  "port": 9000,
+  "source": "ngrok-cli",
+  "updatedAt": "2026-05-27T20:00:00.000Z"
 }
 ```
 
-The mini client reads `wsUrl` and launches the game as:
+Only `wsUrl` is required for players. If the host restarts, the manifest updates and the GitHub Pages launcher picks up the new tunnel on refresh.
 
-```text
-play.html?view=slots&mpServer=<current websocket>&mpName=<player>
+## Downloaded Mini Client
+
+Players who download the mini-client package can run:
+
+```bat
+blackjack-lab.bat mini
 ```
 
-## Where Multiplayer Matters
+That command pulls the `connection` branch, reads `connection.json`, starts a local static mini-client server, and opens the game with multiplayer already configured.
 
-Multiplayer is most visible in the **Slots** floor:
+## What Multiplayer Includes
 
-- other connected players appear in the shared slot lobby
-- player names and avatars are broadcast through the server
-- emotes and position updates let players see each other moving around
-- players can gather around slot machines and blackjack table areas
-
-The **Multiplayer** tab also supports shared blackjack rooms controlled by the backend server.
-
-## What You Can Play
-
-- Slots floor walkaround
-- Generated slot machines and casino areas
-- Blackjack practice and multiplayer table flow
-- Keno
-- Bankroll, bank, drink, history, and strategy tools
-- Player avatars and emotes
-
-## Repo Structure
-
-- `index.html` - GitHub Pages landing page and connection manifest loader.
-- `play.html` - actual browser game client.
-- `src/` - static JavaScript, CSS, and Three.js assets.
-- `connection-settings.js` - optional public manifest URL setting.
-- `connection.json` - offline/local fallback manifest for testing.
-- `.github/workflows/pages.yml` - static GitHub Pages deployment workflow.
+- Shared slots floor presence with player names, avatars, emotes, and movement.
+- Generated slot floor areas, cabinets, progressive labels, and table areas.
+- Shared blackjack rooms from the Multiplayer tab.
+- Host-side surveillance showing players, rooms, games, slot presence, inputs, and reported balances.
 
 ## Security Boundary
 
-This repo intentionally contains only the public browser client. It must not include:
+This public repo must contain only static player-facing files:
 
-- server code
-- ngrok tokens
-- host publish config
-- local player data
-- Node dependencies
-- backend secrets
-- the full development workspace
+- `index.html`
+- `play.html`
+- `connection-settings.js`
+- `connection.json` fallback
+- `.nojekyll`
+- `.github/workflows/pages.yml`
+- `src/` browser assets
+- this `README.md`
 
-The host keeps private infrastructure separate and publishes only current connection details to the manifest repo.
+It must not contain server code, BAT host launchers, ngrok tokens, surveillance keys, host configs, local player data, logs, `node_modules`, or the private development workspace.
+
+## Troubleshooting
+
+- **Manifest unavailable**: the host server is probably offline, the connection branch has not updated yet, or GitHub raw content is temporarily stale. Click **Refresh**.
+- **Server shows `ws://localhost:9000`**: the host has not published a public ngrok tunnel yet. Remote players need a `wss://...ngrok-free.app` URL.
+- **Game opens but no other players appear**: confirm everyone is using the same current manifest and the same live host session.
+- **Browser blocks connection**: GitHub Pages is HTTPS, so remote multiplayer must use `wss://`, not plain `ws://`.

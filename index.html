@@ -252,14 +252,14 @@
       <section class="hero">
         <div class="brand-mark"><span>21</span> Blackjack Lab</div>
         <div>
-          <h1>Mini Casino Client</h1>
-          <p class="lead">A public browser entry point for Blackjack Lab. Check the live connection, choose a player name, and enter the multiplayer slots floor without downloading the private server package.</p>
+          <h1>Blackjack Lab</h1>
+          <p class="lead">A public player entry point for the live Blackjack Lab casino. The page reads the host's current connection manifest, chooses the right WebSocket server, and launches you straight into multiplayer.</p>
         </div>
         <div class="feature-grid">
           <div class="feature"><strong>Multiplayer Slots</strong> Walk the generated casino floor, see other players, emote, inspect cabinets, and sit at games.</div>
           <div class="feature"><strong>Blackjack Table</strong> Practice, learn strategy, and jump from table areas on the floor into blackjack play.</div>
           <div class="feature"><strong>Public Safe</strong> This repo ships only browser code. Server tokens and host config stay private.</div>
-          <div class="feature"><strong>Live Connection</strong> Reads a connection manifest published by the host server at startup.</div>
+          <div class="feature"><strong>Live Connection</strong> Reads the GitHub connection branch that the host updates each time the server starts.</div>
         </div>
       </section>
 
@@ -268,7 +268,7 @@
           <div class="guide-card">
             <h2>Connect And Play</h2>
             <ol class="step-list">
-              <li>Wait for the connection status to show the current server.</li>
+              <li>Wait for the connection status to show an online <strong>wss://</strong> server.</li>
               <li>Enter the name other players should see.</li>
               <li>Click <strong>Enter Casino</strong> to open directly into Slots multiplayer.</li>
             </ol>
@@ -276,11 +276,11 @@
 
           <div class="guide-card">
             <h3>How The Connection Works</h3>
-            <p>The private host server publishes a tiny public <strong>connection.json</strong>. This page reads that file, finds the latest WebSocket server URL, and passes it to the game client.</p>
+            <p>The private host server publishes a tiny public <strong>connection.json</strong> to GitHub. This page reads that file, finds the latest WebSocket server URL, and passes it to the game client.</p>
             <div class="connection-map">
-              <div><span>1. Host</span>Runs the server and updates the manifest.</div>
-              <div><span>2. Manifest</span>Stores only status, updated time, and wsUrl.</div>
-              <div><span>3. Player</span>Launches the game already connected.</div>
+              <div><span>1. Host</span>Runs one launcher for server, ngrok, manifest, and surveillance.</div>
+              <div><span>2. Manifest</span>Stores only connection details like status, updated time, and wsUrl.</div>
+              <div><span>3. Player</span>Launches the public mini client already connected.</div>
             </div>
           </div>
 
@@ -312,7 +312,7 @@
           <button id="saveManifest" class="secondary" type="button">Save Manifest</button>
         </div>
 
-        <p class="fine">Use ?manifest=https://.../connection.json to preconfigure this page. If no manifest is set, it tries ./connection.json, which is useful when the mini client and connection repo are published together for testing.</p>
+        <p class="fine">By default this page reads the official GitHub connection branch. Use ?manifest=https://.../connection.json only when a host gives you a different manifest.</p>
       </section>
     </div>
 

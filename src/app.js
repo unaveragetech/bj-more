@@ -757,6 +757,13 @@ function renderSlots() {
         ...state,
         username: lab.multiplayer?.username || "Guest",
         avatar: lab.avatar,
+        telemetry: {
+          bankroll: lab.bankroll,
+          atmBalance: lab.bank?.atm?.balance || 0,
+          activeDebt: activeDebt(),
+          thirst: lab.drink?.thirst ?? 100,
+          activeView: lab.activeView,
+        },
       };
       if (reason === "enter") sendSlotEnter(payload);
       else sendSlotState(payload);
