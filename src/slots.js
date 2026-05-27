@@ -18,7 +18,7 @@ const SYMBOL_SETS = [
 const NAME_LEFT = ["Lucky", "Neon", "Royal", "Vault", "Midnight", "Cherry", "Golden", "Electric", "Velvet", "Ace"];
 const NAME_RIGHT = ["Lantern", "Queens", "Runner", "Sevens", "Current", "Diamond", "Moon", "Circuit", "Banker", "Jackpot", "Buffalo", "Dragon"];
 const PALETTE = [0xd99a18, 0xd84f45, 0x1f6ccf, 0x18b981, 0x8b5cf6, 0xf97316, 0x06b6d4, 0xef4444, 0x84cc16];
-const GAME_TYPES = ["classic", "video", "bonus", "multiplier", "freeSpins", "holdRespin", "megaways", "mystery", "cascading", "wheelBonus", "pickBonus", "expandingWilds", "sap", "wap"];
+const GAME_TYPES = ["classic", "video", "bonus", "multiplier", "freeSpins", "holdRespin", "megaways", "mystery", "cascading", "wheelBonus", "pickBonus", "expandingWilds", "stickyWilds", "symbolCollector", "walkingWilds", "nudgeReels", "cashLadder", "linkedRespins", "sap", "wap"];
 const ROOM_TYPES = [
   { id: "main", label: "Main Slot Hall", floor: 0x26313b, carpet: 0x7f1d1d, slots: [6, 13] },
   { id: "highLimit", label: "High Limit Salon", floor: 0x172033, carpet: 0x1f6ccf, slots: [4, 8] },
@@ -26,6 +26,10 @@ const ROOM_TYPES = [
   { id: "garden", label: "Garden Atrium", floor: 0x1f342b, carpet: 0x14532d, slots: [2, 6] },
   { id: "retro", label: "Retro Arcade Row", floor: 0x2d263b, carpet: 0x8b5cf6, slots: [5, 10] },
   { id: "transit", label: "Stair Landing", floor: 0x202833, carpet: 0x334155, slots: [0, 3] },
+  { id: "sportsBook", label: "Sportsbook Lounge", floor: 0x1f2937, carpet: 0x0f766e, slots: [2, 5] },
+  { id: "club", label: "Neon Club Row", floor: 0x271a36, carpet: 0xbe185d, slots: [5, 11] },
+  { id: "cashier", label: "Cashier Rotunda", floor: 0x292524, carpet: 0xb45309, slots: [2, 5] },
+  { id: "backbar", label: "Back Bar Slots", floor: 0x2f2419, carpet: 0x7c2d12, slots: [3, 7] },
 ];
 const EMOTES = {
   wave: "WAVE",
@@ -35,6 +39,14 @@ const EMOTES = {
 };
 const HIGH_LIMIT_CREDIT_REQUIREMENT = 25000;
 const BOT_NAMES = ["Mara", "Vince", "Jules", "Rin", "Tess", "Noor", "Cal", "Ivy", "Ezra", "Pax", "Mika", "Sol"];
+const SECURITY_NAMES = ["Reed", "Vale", "Cross", "Moss", "Stone", "Banks"];
+const BOT_ROLES = [
+  { id: "tourist", label: "Tourist", speed: 1.05, playChance: 0.35, talkChance: 0.02 },
+  { id: "regular", label: "Regular", speed: 1.2, playChance: 0.58, talkChance: 0.015 },
+  { id: "highRoller", label: "High Roller", speed: 0.95, playChance: 0.72, talkChance: 0.01 },
+  { id: "server", label: "Drink Server", speed: 1.32, playChance: 0.08, talkChance: 0.025 },
+  { id: "tech", label: "Slot Tech", speed: 1.12, playChance: 0.18, talkChance: 0.018 },
+];
 const BOT_CHAT_LINES = [
   "This machine has been cold all morning.",
   "I am chasing one more bonus, then I swear I am done.",
@@ -42,6 +54,18 @@ const BOT_CHAT_LINES = [
   "Did you see that jackpot bubble?",
   "I like the garden room. Less noise.",
   "Food court tables are softer than they look.",
+  "That bank of machines just went loud.",
+  "Security is circling the high-limit door again.",
+  "The back bar has better bonus timing.",
+  "Progressives look swollen tonight.",
+];
+const SECURITY_LINES = [
+  "Keep the aisle clear.",
+  "Watching the bonus banks.",
+  "Routine floor pass.",
+  "High limit access checked.",
+  "Machine tamper calls go to me.",
+  "Security doors. Move.",
 ];
 const SYMBOL_ART = {
   "7": "7", BAR: "BAR", CHERRY: "🍒", BELL: "🔔", LEMON: "🍋", PLUM: "🟣", WILD: "★",
@@ -116,6 +140,7 @@ export async function initSlotsWorld(config) {
     remotePlayers: new Map(),
     bots: [],
     tableObjects: [],
+    animatedObjects: [],
     localEmote: null,
     localEmoteLabel: null,
     selected: null,
@@ -130,6 +155,7 @@ export async function initSlotsWorld(config) {
     clock: new THREE.Clock(),
     spinHistory: [],
     lastWapLinks: [],
+    lastSecurityIncidentAt: 0,
   };
   runtime.spinButton = runtime.playButton;
   runtime.rulesButton = runtime.rulesButton || runtime.showRulesButton;
@@ -230,6 +256,7 @@ function animate() {
   const dt = Math.min(0.05, runtime.clock.getDelta());
   updatePlayer(dt);
   updateBots(dt);
+  updateAmbientAnimations(dt);
   updateEmoteDisplays();
   ensureChunks();
   publishPresence("move");
@@ -290,6 +317,8 @@ function applyWalkAnimation(phase) {
   const bob = Math.sin(phase * 2) * 0.04;
   parts.leftArm.rotation.x = swing;
   parts.rightArm.rotation.x = -swing;
+  parts.shoulders.rotation.z = Math.sin(phase) * 0.045;
+  parts.hips.rotation.z = -Math.sin(phase) * 0.035;
   if (parts.leftHand) parts.leftHand.position.z = Math.sin(phase) * 0.08;
   if (parts.rightHand) parts.rightHand.position.z = -Math.sin(phase) * 0.08;
   parts.leftLeg.rotation.x = -swing;
@@ -305,6 +334,8 @@ function resetWalkPose() {
   const parts = runtime.player.userData.parts;
   parts.leftArm.rotation.x = 0;
   parts.rightArm.rotation.x = 0;
+  parts.shoulders.rotation.z = 0;
+  parts.hips.rotation.z = 0;
   if (parts.leftHand) parts.leftHand.position.z = -0.01;
   if (parts.rightHand) parts.rightHand.position.z = -0.01;
   parts.leftLeg.rotation.x = 0;
@@ -337,6 +368,7 @@ function ensureChunks() {
       runtime.machineObjects = runtime.machineObjects.filter((item) => !chunk.machines.includes(item));
       runtime.tableObjects = runtime.tableObjects.filter((item) => !chunk.tables.includes(item));
       runtime.bots = runtime.bots.filter((bot) => bot.chunkKey !== key);
+      runtime.animatedObjects = runtime.animatedObjects.filter((item) => item.chunkKey !== key);
       runtime.chunks.delete(key);
     }
   }
@@ -361,12 +393,46 @@ function updateEmoteDisplays() {
   }
 }
 
+function registerAnimated(object, kind, chunkKey = "", speed = 1, phase = 0) {
+  if (!runtime?.animatedObjects || !object) return;
+  object.userData.baseY = object.position?.y || 0;
+  object.userData.baseScale = object.scale?.clone?.() || null;
+  runtime.animatedObjects.push({ object, kind, chunkKey, speed, phase });
+}
+
+function updateAmbientAnimations(dt) {
+  if (!runtime?.animatedObjects?.length) return;
+  for (const item of runtime.animatedObjects) {
+    const object = item.object;
+    if (!object?.parent) continue;
+    item.phase += dt * item.speed;
+    const wave = Math.sin(item.phase);
+    if (item.kind === "bob") {
+      object.position.y = (object.userData.baseY || 0) + wave * 0.045;
+    } else if (item.kind === "pulse") {
+      const material = Array.isArray(object.material) ? object.material[0] : object.material;
+      if (material) {
+        if ("emissiveIntensity" in material) material.emissiveIntensity = 0.25 + Math.abs(wave) * 0.65;
+        if ("opacity" in material) material.opacity = 0.45 + Math.abs(wave) * 0.42;
+      }
+    } else if (item.kind === "spin") {
+      object.rotation.y += dt * item.speed;
+      object.rotation.x = Math.sin(item.phase * 0.7) * 0.12;
+    } else if (item.kind === "sweep") {
+      object.rotation.y += Math.cos(item.phase) * dt * 0.45;
+    } else if (item.kind === "bounce") {
+      object.position.y = (object.userData.baseY || 0) + Math.abs(wave) * 0.08;
+    }
+  }
+}
+
 function buildChunk(cx, cz) {
   const { THREE, scene } = runtime;
   const seed = hash(`${cx}:${cz}:casino`);
   const rng = mulberry32(seed);
   const room = roomTypeFor(cx, cz, rng);
   const group = new THREE.Group();
+  group.userData.chunkKey = `${cx},${cz}`;
   group.position.set(cx * CHUNK_SIZE, 0, cz * CHUNK_SIZE);
 
   const floorColor = room.floor;
@@ -428,7 +494,9 @@ function buildChunk(cx, cz) {
     runtime.machineObjects.push(object);
   }
   addBlackjackTables(THREE, group, rng, room, tables, cx, cz);
+  addRouletteTables(THREE, group, rng, room, tables, cx, cz);
   addBotsToChunk(THREE, group, rng, room, machines, `${cx},${cz}`);
+  addSecurityPatrolsToChunk(THREE, group, rng, room, `${cx},${cz}`);
 
   scene.add(group);
   return { group, machines, tables };
@@ -443,10 +511,14 @@ function roomTypeFor(cx, cz, rng) {
   if (cx === 0 && cz === 0) return ROOM_TYPES[0];
   const roll = rng();
   if ((cx + cz) % 5 === 0) return ROOM_TYPES.find((room) => room.id === "transit");
-  if (roll < 0.18) return ROOM_TYPES.find((room) => room.id === "foodCourt");
-  if (roll < 0.34) return ROOM_TYPES.find((room) => room.id === "garden");
-  if (roll < 0.52) return ROOM_TYPES.find((room) => room.id === "highLimit");
-  if (roll < 0.72) return ROOM_TYPES.find((room) => room.id === "retro");
+  if (roll < 0.12) return ROOM_TYPES.find((room) => room.id === "foodCourt");
+  if (roll < 0.23) return ROOM_TYPES.find((room) => room.id === "garden");
+  if (roll < 0.38) return ROOM_TYPES.find((room) => room.id === "highLimit");
+  if (roll < 0.51) return ROOM_TYPES.find((room) => room.id === "retro");
+  if (roll < 0.62) return ROOM_TYPES.find((room) => room.id === "sportsBook");
+  if (roll < 0.74) return ROOM_TYPES.find((room) => room.id === "club");
+  if (roll < 0.84) return ROOM_TYPES.find((room) => room.id === "cashier");
+  if (roll < 0.93) return ROOM_TYPES.find((room) => room.id === "backbar");
   return ROOM_TYPES[0];
 }
 
@@ -454,6 +526,9 @@ function reservedByRoom(room, localX, localZ) {
   if (room.id === "foodCourt" && Math.abs(localX) < 4.8 && Math.abs(localZ) < 4.5) return true;
   if (room.id === "transit" && Math.abs(localX) < 5.2 && Math.abs(localZ) < 5.2) return true;
   if (room.id === "garden" && Math.abs(localX) < 3.4 && Math.abs(localZ) < 3.4) return true;
+  if (room.id === "sportsBook" && localZ < -2.2 && Math.abs(localX) < 6.4) return true;
+  if (room.id === "cashier" && Math.hypot(localX, localZ) < 3.1) return true;
+  if (room.id === "backbar" && localZ < -5.15) return true;
   return false;
 }
 
@@ -485,6 +560,7 @@ function addCasinoArchitecture(THREE, group, rng, room) {
   const label = buildAreaLabel(THREE, room.label);
   label.position.set(0, 3.05, -8.05);
   group.add(label);
+  registerAnimated(label, "bob", group.userData.chunkKey || "", 0.45, rng() * Math.PI * 2);
 }
 
 function addChunkWalls(THREE, group, cx, cz, room) {
@@ -526,6 +602,8 @@ function addHighLimitDoor(THREE, group, x, z) {
 }
 
 function addRoomFeatures(THREE, group, rng, room) {
+  addCeilingMood(THREE, group, rng, room);
+  addSecurityDoorBank(THREE, group, rng, room);
   if (room.id === "foodCourt") {
     addFoodCourt(THREE, group, rng);
   } else if (room.id === "transit") {
@@ -536,6 +614,45 @@ function addRoomFeatures(THREE, group, rng, room) {
     addHighLimitLounge(THREE, group, rng);
   } else if (room.id === "retro") {
     addRetroArcadeTrim(THREE, group, rng);
+  } else if (room.id === "sportsBook") {
+    addSportsBookLounge(THREE, group, rng);
+  } else if (room.id === "club") {
+    addNeonClub(THREE, group, rng);
+  } else if (room.id === "cashier") {
+    addCashierRotunda(THREE, group, rng);
+  } else if (room.id === "backbar") {
+    addBackBar(THREE, group, rng);
+  }
+}
+
+function addSecurityDoorBank(THREE, group, rng, room) {
+  if (!["main", "highLimit", "cashier", "backbar"].includes(room.id) && rng() > 0.35) return;
+  const doorMat = new THREE.MeshStandardMaterial({ color: 0x111827, metalness: 0.28, roughness: 0.34 });
+  const frameMat = new THREE.MeshStandardMaterial({ color: 0xd99a18, metalness: 0.65, roughness: 0.28 });
+  const door = new THREE.Mesh(new THREE.BoxGeometry(1.7, 2.35, 0.16), doorMat);
+  door.position.set(-7.9, 1.18, room.id === "highLimit" ? -3.8 : 4.2);
+  group.add(door);
+  const frame = new THREE.Mesh(new THREE.BoxGeometry(2.05, 2.68, 0.08), frameMat);
+  frame.position.set(door.position.x, 1.32, door.position.z - 0.03);
+  group.add(frame);
+  const label = buildAreaLabel(THREE, "SECURITY");
+  label.position.set(door.position.x + 0.2, 2.85, door.position.z);
+  label.scale.set(1.55, 0.38, 1);
+  group.add(label);
+  registerAnimated(label, "pulse", group.userData.chunkKey, 0.85, rng() * Math.PI * 2);
+}
+
+function addCeilingMood(THREE, group, rng, room) {
+  const colors = room.id === "club" ? [0xbe185d, 0x06b6d4, 0xfacc15] : [room.carpet, PALETTE[Math.floor(rng() * PALETTE.length)], 0xffffff];
+  for (let i = 0; i < 4; i++) {
+    const strip = new THREE.Mesh(
+      new THREE.BoxGeometry(3.4 + rng() * 2.2, 0.06, 0.08),
+      new THREE.MeshBasicMaterial({ color: colors[i % colors.length], transparent: true, opacity: 0.72 })
+    );
+    strip.position.set(-5.2 + i * 3.5, 3.35, -7.4 + rng() * 14.8);
+    strip.rotation.y = rng() * 0.4 - 0.2;
+    group.add(strip);
+    registerAnimated(strip, "pulse", group.userData.chunkKey || "", 0.55 + rng(), rng() * Math.PI * 2);
   }
 }
 
@@ -636,6 +753,82 @@ function addRetroArcadeTrim(THREE, group, rng) {
   }
 }
 
+function addSportsBookLounge(THREE, group, rng) {
+  const screenMat = new THREE.MeshStandardMaterial({ color: 0x0f172a, emissive: 0x0f766e, emissiveIntensity: 0.45, roughness: 0.2 });
+  for (let x = -5.4; x <= 5.4; x += 2.7) {
+    const screen = new THREE.Mesh(new THREE.BoxGeometry(2.15, 1.05, 0.12), screenMat.clone());
+    screen.position.set(x, 2.1, -7.9);
+    group.add(screen);
+    registerAnimated(screen, "pulse", group.userData.chunkKey, 0.8 + rng(), rng() * Math.PI * 2);
+  }
+  [-3.6, 0, 3.6].forEach((x) => addLoungeSeat(THREE, group, x, 4.8, rng() > 0.5 ? 0x0f766e : 0x334155));
+  addAreaKiosk(THREE, group, 6.0, -5.5, 0x0f766e);
+}
+
+function addNeonClub(THREE, group, rng) {
+  const stage = new THREE.Mesh(
+    new THREE.CylinderGeometry(1.55, 1.85, 0.28, 24),
+    new THREE.MeshStandardMaterial({ color: 0x111827, metalness: 0.35, roughness: 0.24 })
+  );
+  stage.position.set(0, 0.15, -2.7);
+  group.add(stage);
+  const disco = new THREE.Mesh(
+    new THREE.SphereGeometry(0.42, 18, 18),
+    new THREE.MeshStandardMaterial({ color: 0xf8fafc, emissive: 0xbe185d, emissiveIntensity: 0.7, metalness: 0.85, roughness: 0.18 })
+  );
+  disco.position.set(0, 2.85, -2.7);
+  group.add(disco);
+  registerAnimated(disco, "spin", group.userData.chunkKey, 1.6, rng() * Math.PI * 2);
+  for (let i = 0; i < 5; i++) {
+    const beam = new THREE.Mesh(
+      new THREE.BoxGeometry(0.08, 0.08, 4.8),
+      new THREE.MeshBasicMaterial({ color: PALETTE[Math.floor(rng() * PALETTE.length)], transparent: true, opacity: 0.5 })
+    );
+    beam.position.set(-4 + i * 2, 2.45, -2.5);
+    beam.rotation.y = -0.7 + i * 0.35;
+    group.add(beam);
+    registerAnimated(beam, "sweep", group.userData.chunkKey, 0.7 + rng(), rng() * Math.PI * 2);
+  }
+}
+
+function addCashierRotunda(THREE, group, rng) {
+  const counterMat = new THREE.MeshStandardMaterial({ color: 0x78350f, roughness: 0.42, metalness: 0.15 });
+  const counter = new THREE.Mesh(new THREE.CylinderGeometry(2.0, 2.25, 0.9, 32, 1, true), counterMat);
+  counter.position.set(0, 0.58, 0);
+  group.add(counter);
+  const cageMat = new THREE.MeshBasicMaterial({ color: 0xfacc15, transparent: true, opacity: 0.42 });
+  for (let i = 0; i < 12; i++) {
+    const angle = (Math.PI * 2 * i) / 12;
+    const bar = new THREE.Mesh(new THREE.BoxGeometry(0.035, 1.4, 0.035), cageMat);
+    bar.position.set(Math.cos(angle) * 2.1, 1.32, Math.sin(angle) * 2.1);
+    group.add(bar);
+  }
+  const sign = buildAreaLabel(THREE, "CASHIER CAGE");
+  sign.position.set(0, 2.55, 0);
+  sign.scale.set(2.1, 0.52, 1);
+  group.add(sign);
+  registerAnimated(sign, "bob", group.userData.chunkKey, 0.5, rng() * Math.PI * 2);
+}
+
+function addBackBar(THREE, group, rng) {
+  const bar = new THREE.Mesh(
+    new THREE.BoxGeometry(9.5, 1.05, 0.95),
+    new THREE.MeshStandardMaterial({ color: 0x4a2d19, roughness: 0.5, metalness: 0.08 })
+  );
+  bar.position.set(0, 0.58, -6.8);
+  group.add(bar);
+  for (let x = -4; x <= 4; x += 1.6) {
+    const stool = new THREE.Mesh(
+      new THREE.CylinderGeometry(0.22, 0.26, 0.5, 14),
+      new THREE.MeshStandardMaterial({ color: 0x7c2d12, roughness: 0.48 })
+    );
+    stool.position.set(x, 0.28, -5.55);
+    group.add(stool);
+  }
+  addAreaKiosk(THREE, group, -5.8, 5.7, 0xd99a18);
+  addAreaKiosk(THREE, group, 5.8, 5.7, 0xbe185d);
+}
+
 function addLoungeSeat(THREE, group, x, z, color) {
   const mat = new THREE.MeshStandardMaterial({ color, roughness: 0.58 });
   const base = new THREE.Mesh(new THREE.BoxGeometry(2.2, 0.36, 0.9), mat);
@@ -705,15 +898,17 @@ function addBotsToChunk(THREE, group, rng, room, machines, chunkKey) {
     : room.id === "transit" ? 1 + Math.floor(rng() * 2)
     : 1 + Math.floor(rng() * 4);
   for (let i = 0; i < botCount; i++) {
-    const avatar = botAvatar(rng);
+    const role = chooseBotRole(rng, room);
+    const avatar = botAvatar(rng, role.id);
     const botGroup = buildPlayer(THREE, group, avatar);
     const name = BOT_NAMES[Math.floor(rng() * BOT_NAMES.length)];
-    const label = buildNameLabel(THREE, name);
+    const label = buildNameLabel(THREE, role.id === "server" ? `${name} - Server` : role.id === "tech" ? `${name} - Tech` : name);
     group.add(label);
     const bot = {
       group: botGroup,
       label,
       name,
+      role,
       avatar,
       chunkKey,
       machines,
@@ -733,6 +928,60 @@ function addBotsToChunk(THREE, group, rng, room, machines, chunkKey) {
   }
 }
 
+function addSecurityPatrolsToChunk(THREE, group, rng, room, chunkKey) {
+  if (chunkKey === "0,0" && rng() < 0.35) return;
+  const count = room.id === "highLimit" ? 2 : room.id === "cashier" ? 2 : rng() < 0.42 ? 1 : 0;
+  for (let i = 0; i < count; i++) {
+    const role = { id: "security", label: "Security", speed: 1.05, playChance: 0, talkChance: 0.025 };
+    const avatar = botAvatar(rng, "security");
+    const groupBot = buildPlayer(THREE, group, avatar);
+    const name = SECURITY_NAMES[Math.floor(rng() * SECURITY_NAMES.length)];
+    const label = buildNameLabel(THREE, `Officer ${name}`);
+    const patrol = patrolRouteForRoom(room, rng);
+    group.add(label);
+    const bot = {
+      group: groupBot,
+      label,
+      name: `Officer ${name}`,
+      role,
+      avatar,
+      chunkKey,
+      machines: [],
+      rng,
+      walkPhase: rng() * Math.PI * 2,
+      state: "patrol",
+      timer: 2 + rng() * 4,
+      target: patrol[0],
+      patrol,
+      patrolIndex: 0,
+      seatedMachine: null,
+      emote: null,
+      emoteLabel: buildEmoteLabel(THREE, ""),
+    };
+    bot.emoteLabel.visible = false;
+    group.add(bot.emoteLabel);
+    bot.group.position.set(patrol[0].x, 0, patrol[0].z);
+    runtime.bots.push(bot);
+  }
+}
+
+function chooseBotRole(rng, room) {
+  if (room.id === "foodCourt" && rng() < 0.32) return BOT_ROLES.find((role) => role.id === "server");
+  if (room.id === "highLimit" && rng() < 0.45) return BOT_ROLES.find((role) => role.id === "highRoller");
+  if (room.id === "cashier" && rng() < 0.35) return BOT_ROLES.find((role) => role.id === "tech");
+  if (rng() < 0.16) return BOT_ROLES.find((role) => role.id === "tourist");
+  if (rng() < 0.27) return BOT_ROLES.find((role) => role.id === "server");
+  if (rng() < 0.36) return BOT_ROLES.find((role) => role.id === "tech");
+  return BOT_ROLES.find((role) => role.id === "regular");
+}
+
+function patrolRouteForRoom(room, rng) {
+  if (room.id === "highLimit") return [{ x: -4.5, z: -5.7 }, { x: 4.5, z: -5.7 }, { x: 5.5, z: 5.2 }, { x: -5.5, z: 5.2 }];
+  if (room.id === "cashier") return [{ x: -5.8, z: -4.8 }, { x: 5.8, z: -4.8 }, { x: 5.8, z: 4.8 }, { x: -5.8, z: 4.8 }];
+  const offset = rng() * 1.4;
+  return [{ x: -6 + offset, z: -5.8 }, { x: 6 - offset, z: -5.8 }, { x: 6 - offset, z: 5.8 }, { x: -6 + offset, z: 5.8 }];
+}
+
 function addBlackjackTables(THREE, group, rng, room, tables, cx, cz) {
   const count = room.id === "foodCourt" ? 2 : room.id === "highLimit" ? 1 : rng() < 0.38 ? 1 : 0;
   const reserved = room.id === "foodCourt"
@@ -743,6 +992,16 @@ function addBlackjackTables(THREE, group, rng, room, tables, cx, cz) {
   for (let i = 0; i < count; i++) {
     const pos = reserved[i] || { x: -5 + rng() * 10, z: 4 + rng() * 2 };
     const table = buildBlackjackTable(THREE, group, pos.x, pos.z, room, `${cx}:${cz}:bj:${i}`);
+    tables.push(table);
+    runtime.tableObjects.push(table);
+  }
+}
+
+function addRouletteTables(THREE, group, rng, room, tables, cx, cz) {
+  const count = room.id === "club" ? 1 : room.id === "backbar" ? 1 : room.id === "highLimit" && rng() < 0.55 ? 1 : rng() < 0.22 ? 1 : 0;
+  for (let i = 0; i < count; i++) {
+    const pos = room.id === "club" ? { x: 4.9, z: 1.6 } : room.id === "backbar" ? { x: -4.8, z: 2.8 } : { x: 4.8 - rng() * 9.6, z: -1.5 + rng() * 5.2 };
+    const table = buildRouletteTable(THREE, group, pos.x, pos.z, room, `${cx}:${cz}:rt:${i}`);
     tables.push(table);
     runtime.tableObjects.push(table);
   }
@@ -781,6 +1040,7 @@ function buildBlackjackTable(THREE, group, localX, localZ, room, id) {
   const table = {
     id,
     name: room.id === "highLimit" ? "High Limit Blackjack" : "Blackjack Table",
+    kind: "blackjack",
     room,
     x: group.position.x + localX,
     z: group.position.z + localZ,
@@ -791,17 +1051,68 @@ function buildBlackjackTable(THREE, group, localX, localZ, room, id) {
   return table;
 }
 
-function botAvatar(rng) {
+function buildRouletteTable(THREE, group, localX, localZ, room, id) {
+  const tableGroup = new THREE.Group();
+  tableGroup.position.set(localX, 0, localZ);
+  const base = new THREE.Mesh(
+    new THREE.CylinderGeometry(1.25, 1.42, 0.2, 36),
+    new THREE.MeshStandardMaterial({ color: 0x064e3b, roughness: 0.52 })
+  );
+  base.position.y = 0.62;
+  tableGroup.add(base);
+  const wheel = new THREE.Mesh(
+    new THREE.TorusGeometry(0.7, 0.12, 12, 40),
+    new THREE.MeshStandardMaterial({ color: 0x7f1d1d, metalness: 0.25, roughness: 0.32 })
+  );
+  wheel.position.y = 0.8;
+  wheel.rotation.x = Math.PI / 2;
+  tableGroup.add(wheel);
+  registerAnimated(wheel, "spin", group.userData.chunkKey, 0.7, hash(id));
+  const rotor = new THREE.Mesh(
+    new THREE.CylinderGeometry(0.16, 0.2, 0.08, 18),
+    new THREE.MeshStandardMaterial({ color: 0xd99a18, metalness: 0.65, roughness: 0.22 })
+  );
+  rotor.position.y = 0.86;
+  tableGroup.add(rotor);
+  const sign = buildAreaLabel(THREE, room.id === "highLimit" ? "VIP ROULETTE" : "ROULETTE");
+  sign.position.set(0, 1.65, -0.65);
+  sign.scale.set(1.75, 0.44, 1);
+  tableGroup.add(sign);
+  const clickables = [base, wheel, rotor];
+  group.add(tableGroup);
+  const table = {
+    id,
+    name: room.id === "highLimit" ? "High Limit Roulette" : "Roulette Table",
+    kind: "roulette",
+    room,
+    x: group.position.x + localX,
+    z: group.position.z + localZ,
+    group: tableGroup,
+    clickables,
+  };
+  clickables.forEach((mesh) => { mesh.userData.blackjackTable = table; });
+  return table;
+}
+
+function botAvatar(rng, roleId = "regular") {
   const colors = ["#23335f", "#7f1d1d", "#14532d", "#4c1d95", "#78350f", "#0f766e"];
   const skin = ["#f1c27d", "#c68642", "#8d5524", "#ffdbac", "#e0ac69"];
+  const roleColors = {
+    security: ["#111827", "#020617", "#d99a18", "armor"],
+    server: ["#7f1d1d", "#111827", "#facc15", "neon"],
+    tech: ["#334155", "#0f172a", "#06b6d4", "armor"],
+    highRoller: ["#581c87", "#1f2937", "#d99a18", "neon"],
+    tourist: ["#0f766e", "#365314", "#18b981", "classic"],
+  };
+  const role = roleColors[roleId];
   return {
     skinTone: skin[Math.floor(rng() * skin.length)],
-    bodyColor: colors[Math.floor(rng() * colors.length)],
-    limbColor: colors[Math.floor(rng() * colors.length)],
+    bodyColor: role?.[0] || colors[Math.floor(rng() * colors.length)],
+    limbColor: role?.[1] || colors[Math.floor(rng() * colors.length)],
     visorColor: "#101820",
-    accentColor: `#${PALETTE[Math.floor(rng() * PALETTE.length)].toString(16).padStart(6, "0")}`,
-    style: rng() > 0.82 ? "neon" : rng() > 0.65 ? "armor" : "classic",
-    bodyShape: rng() > 0.72 ? "tapered" : "box",
+    accentColor: role?.[2] || `#${PALETTE[Math.floor(rng() * PALETTE.length)].toString(16).padStart(6, "0")}`,
+    style: role?.[3] || (rng() > 0.82 ? "neon" : rng() > 0.65 ? "armor" : "classic"),
+    bodyShape: roleId === "security" || roleId === "tech" ? "armor" : rng() > 0.72 ? "tapered" : "box",
   };
 }
 
@@ -824,15 +1135,27 @@ function updateBots(dt) {
 }
 
 function updateBotWalking(bot, dt) {
+  if (bot.state === "escort") {
+    updateSecurityEscort(bot, dt);
+    return;
+  }
   const dx = bot.target.x - bot.group.position.x;
   const dz = bot.target.z - bot.group.position.z;
   const dist = Math.hypot(dx, dz);
   if (dist < 0.25 || bot.timer <= 0) {
-    if (bot.machines.length && bot.rng() < 0.48) {
+    if (bot.role?.id === "security" || bot.state === "patrol") {
+      if (bot.rng() < 0.16 && tryStartSecurityEscort(bot)) return;
+      bot.patrolIndex = ((bot.patrolIndex || 0) + 1) % Math.max(1, bot.patrol?.length || 1);
+      bot.target = bot.patrol?.[bot.patrolIndex] || randomBotTarget(bot.rng);
+      bot.timer = 3 + bot.rng() * 5;
+      if (bot.rng() < 0.18) speakBotLine(bot, SECURITY_LINES[Math.floor(bot.rng() * SECURITY_LINES.length)], "think");
+      return;
+    }
+    if (bot.machines.length && bot.rng() < (bot.role?.playChance ?? 0.48)) {
       const machine = bot.machines[Math.floor(bot.rng() * bot.machines.length)];
       bot.state = "play";
       bot.seatedMachine = machine;
-      bot.timer = 3 + bot.rng() * 8;
+      bot.timer = bot.role?.id === "highRoller" ? 7 + bot.rng() * 12 : 3 + bot.rng() * 8;
       bot.group.position.set(machine.group.position.x, 0, machine.group.position.z + 1.35);
       bot.group.rotation.y = Math.PI;
       startBotEmote(bot, bot.rng() > 0.5 ? "think" : "wave");
@@ -842,13 +1165,61 @@ function updateBotWalking(bot, dt) {
     bot.timer = 2 + bot.rng() * 6;
     return;
   }
-  const speed = 1.25 + bot.rng() * 0.012;
+  const speed = (bot.role?.speed || 1.25) + bot.rng() * 0.012;
   bot.group.position.x += (dx / dist) * speed * dt;
   bot.group.position.z += (dz / dist) * speed * dt;
   bot.group.rotation.y = Math.atan2(dx, dz) + Math.PI;
-  bot.walkPhase += dt * 7;
+  bot.walkPhase += dt * (bot.role?.id === "security" ? 6.2 : 7.2);
   applyBotWalk(bot, bot.walkPhase);
   maybeStartBotConversation(bot);
+}
+
+function tryStartSecurityEscort(security) {
+  if (security.role?.id !== "security") return false;
+  const candidate = runtime.bots.find((bot) => bot !== security && bot.chunkKey === security.chunkKey && bot.role?.id !== "security" && Math.hypot(bot.group.position.x - security.group.position.x, bot.group.position.z - security.group.position.z) < 4.8);
+  if (!candidate) return false;
+  security.state = "escort";
+  security.escortTarget = candidate;
+  security.target = { x: -7.7, z: candidate.group.position.z > 0 ? 4.2 : -4.2 };
+  candidate.state = "detained";
+  candidate.timer = 5;
+  speakBotLine(security, SECURITY_LINES[Math.floor(security.rng() * SECURITY_LINES.length)], "think");
+  speakBotLine(candidate, "Wait, what did I do?", "think");
+  return true;
+}
+
+function updateSecurityEscort(security, dt) {
+  const target = security.escortTarget;
+  if (!target || !runtime.bots.includes(target)) {
+    security.state = "patrol";
+    security.target = security.patrol?.[security.patrolIndex || 0] || randomBotTarget(security.rng);
+    return;
+  }
+  const dx = security.target.x - security.group.position.x;
+  const dz = security.target.z - security.group.position.z;
+  const dist = Math.hypot(dx, dz);
+  if (dist < 0.25) {
+    target.group.visible = false;
+    target.label.visible = false;
+    target.emoteLabel.visible = false;
+    runtime.bots = runtime.bots.filter((bot) => bot !== target);
+    security.escortTarget = null;
+    security.state = "patrol";
+    security.timer = 2 + security.rng() * 4;
+    security.target = security.patrol?.[security.patrolIndex || 0] || randomBotTarget(security.rng);
+    speakBotLine(security, "Guest removed from the floor.", "think");
+    return;
+  }
+  const speed = 1.45;
+  security.group.position.x += (dx / dist) * speed * dt;
+  security.group.position.z += (dz / dist) * speed * dt;
+  security.group.rotation.y = Math.atan2(dx, dz) + Math.PI;
+  target.group.position.set(security.group.position.x + 0.42, 0, security.group.position.z + 0.28);
+  target.group.rotation.y = security.group.rotation.y;
+  security.walkPhase += dt * 7.5;
+  target.walkPhase += dt * 9;
+  applyBotWalk(security, security.walkPhase);
+  applyBotWalk(target, target.walkPhase);
 }
 
 function updateBotPlaying(bot) {
@@ -865,11 +1236,18 @@ function updateBotPlaying(bot) {
 function applyBotWalk(bot, phase) {
   const parts = bot.group.userData.parts;
   if (!parts) return;
-  const swing = Math.sin(phase) * 0.55;
+  const swing = Math.sin(phase) * (bot.role?.id === "security" ? 0.42 : 0.58);
+  const bob = Math.sin(phase * 2) * 0.025;
   parts.leftArm.rotation.x = swing;
   parts.rightArm.rotation.x = -swing;
   parts.leftLeg.rotation.x = -swing;
   parts.rightLeg.rotation.x = swing;
+  if (parts.leftHand) parts.leftHand.position.z = Math.sin(phase) * 0.06;
+  if (parts.rightHand) parts.rightHand.position.z = -Math.sin(phase) * 0.06;
+  if (parts.leftFoot) parts.leftFoot.rotation.x = -swing * 0.22;
+  if (parts.rightFoot) parts.rightFoot.rotation.x = swing * 0.22;
+  parts.head.position.y = 1.48 + bob;
+  parts.shoulders.rotation.z = Math.sin(phase) * 0.035;
 }
 
 function resetBotPose(bot) {
@@ -879,6 +1257,12 @@ function resetBotPose(bot) {
   parts.rightArm.rotation.x = 0;
   parts.leftLeg.rotation.x = 0;
   parts.rightLeg.rotation.x = 0;
+  if (parts.leftHand) parts.leftHand.position.z = -0.01;
+  if (parts.rightHand) parts.rightHand.position.z = -0.01;
+  if (parts.leftFoot) parts.leftFoot.rotation.x = 0;
+  if (parts.rightFoot) parts.rightFoot.rotation.x = 0;
+  parts.head.position.y = 1.48;
+  parts.shoulders.rotation.z = 0;
 }
 
 function startBotEmote(bot, kind) {
@@ -904,7 +1288,7 @@ function maybeStartBotConversation(bot) {
   const now = performance.now();
   const intervalMs = Math.max(4, Number(settings.frequencySeconds || 18)) * 1000;
   if (now - runtime.lastBotConversationAt < intervalMs) return;
-  if (bot.rng() > 0.015) return;
+  if (bot.rng() > (bot.role?.talkChance || 0.015)) return;
   const neighbor = runtime.bots.find((other) => other !== bot && other.chunkKey === bot.chunkKey && Math.hypot(other.group.position.x - bot.group.position.x, other.group.position.z - bot.group.position.z) < 4.2);
   if (!neighbor) return;
   runtime.lastBotConversationAt = now;
@@ -951,9 +1335,9 @@ function createMachineDefinition(cx, cz, row, col, rng) {
   const family = SYMBOL_SETS[Math.floor(rng() * SYMBOL_SETS.length)];
   const color = PALETTE[Math.floor(rng() * PALETTE.length)];
   const gameType = GAME_TYPES[Math.floor(rng() * GAME_TYPES.length)];
-  const reels = gameType === "classic" ? 3 : rng() > 0.18 ? 5 : 3;
+  const reels = ["classic", "nudgeReels"].includes(gameType) ? 3 : rng() > 0.18 ? 5 : 3;
   const style = gameType === "classic" || rng() < 0.38 ? "physical" : "digital";
-  const maxLines = reels === 3 ? [1, 3][Math.floor(rng() * 2)] : gameType === "video" ? [15, 20, 25][Math.floor(rng() * 3)] : [5, 9, 15][Math.floor(rng() * 3)];
+  const maxLines = maxLinesForGame(gameType, reels, rng);
   const volatility = ["low", "medium", "high"][Math.floor(rng() * 3)];
   const name = `${NAME_LEFT[Math.floor(rng() * NAME_LEFT.length)]} ${NAME_RIGHT[Math.floor(rng() * NAME_RIGHT.length)]}`;
   const premium = family[family.length - 2];
@@ -965,11 +1349,13 @@ function createMachineDefinition(cx, cz, row, col, rng) {
   return {
     id: `${cx}:${cz}:${row}:${col}`,
     name,
-    theme: `${capitalize(volatility)} volatility ${style} ${reels}-reel cabinet`,
+    theme: `${capitalize(volatility)} volatility ${style} ${reels}-reel ${gameTypeLabel(gameType)} cabinet`,
     color,
     reels,
     style,
     gameType,
+    featureTitle: gameTypeLabel(gameType),
+    cabinetVariant: ["tower", "slant", "curved", "doubleScreen"][Math.floor(rng() * 4)],
     progressiveType,
     progressiveTotal: progressiveBase,
     progressiveOdds,
@@ -993,6 +1379,40 @@ function createMachineDefinition(cx, cz, row, col, rng) {
       default: gameType === "multiplier" ? 5 : volatility === "low" ? 4 : 3,
     },
   };
+}
+
+function maxLinesForGame(gameType, reels, rng) {
+  if (reels === 3) return gameType === "nudgeReels" ? [3, 5][Math.floor(rng() * 2)] : [1, 3][Math.floor(rng() * 2)];
+  if (["megaways", "linkedRespins"].includes(gameType)) return [20, 25, 40][Math.floor(rng() * 3)];
+  if (["video", "cascading", "symbolCollector", "walkingWilds"].includes(gameType)) return [15, 20, 25][Math.floor(rng() * 3)];
+  if (["cashLadder", "wheelBonus", "pickBonus"].includes(gameType)) return [5, 10, 15][Math.floor(rng() * 3)];
+  return [5, 9, 15][Math.floor(rng() * 3)];
+}
+
+function gameTypeLabel(gameType) {
+  const labels = {
+    classic: "classic",
+    video: "video",
+    bonus: "pick bonus",
+    multiplier: "multiplier",
+    freeSpins: "free spins",
+    holdRespin: "hold-and-respin",
+    megaways: "many-ways",
+    mystery: "mystery reveal",
+    cascading: "cascade",
+    wheelBonus: "wheel bonus",
+    pickBonus: "pick bonus",
+    expandingWilds: "expanding wilds",
+    stickyWilds: "sticky wilds",
+    symbolCollector: "symbol collector",
+    walkingWilds: "walking wilds",
+    nudgeReels: "nudge reels",
+    cashLadder: "cash ladder",
+    linkedRespins: "linked respins",
+    sap: "standalone progressive",
+    wap: "wide-area progressive",
+  };
+  return labels[gameType] || gameType;
 }
 
 function wapLinkedGames(sourceName, rng) {
@@ -1117,10 +1537,16 @@ function setSelectedTable(table) {
 
 function sitAtSelected() {
   if (runtime.selectedTable) {
-    runtime.onBlackjackTable?.(runtime.selectedTable);
+    if (runtime.selectedTable.kind === "roulette") runtime.onRouletteTable?.(runtime.selectedTable);
+    else runtime.onBlackjackTable?.(runtime.selectedTable);
     return;
   }
   if (!runtime.selected) return;
+  if (runtime.securityLocked?.()) {
+    runtime.info.textContent = runtime.securityLockReason?.() || "Security has locked floor play for now.";
+    runtime.resultBox.textContent = runtime.info.textContent;
+    return;
+  }
   runtime.seated = runtime.selected;
   runtime.player.position.set(runtime.selected.x, 0, runtime.selected.z + 1.75);
   runtime.player.rotation.y = Math.PI;
@@ -1145,15 +1571,15 @@ function updateMachinePanel() {
     const table = runtime.selectedTable;
     runtime.name.textContent = table.name;
     if (runtime.consoleTitle) runtime.consoleTitle.textContent = table.name;
-    runtime.info.textContent = `${table.name}. Sit down to open the blackjack table.`;
+    runtime.info.textContent = `${table.name}. Sit down to open the ${table.kind === "roulette" ? "roulette" : "blackjack"} table.`;
     runtime.detail.innerHTML = `<strong>${escapeHtml(table.name)}</strong><span>${table.room.id === "highLimit" ? `${chips(HIGH_LIMIT_CREDIT_REQUIREMENT)} credit room.` : "Table games area."}</span>`;
     runtime.sitButton.disabled = false;
-    runtime.sitButton.textContent = "Sit at blackjack";
+    runtime.sitButton.textContent = table.kind === "roulette" ? "Sit at roulette" : "Sit at blackjack";
     runtime.leaveButton.disabled = true;
     runtime.spinButton.disabled = true;
     if (runtime.rulesButton) runtime.rulesButton.disabled = true;
     runtime.machineFace.innerHTML = emptyMachineMarkup();
-    runtime.betReadout.textContent = "Blackjack uses the main Table rules.";
+    runtime.betReadout.textContent = table.kind === "roulette" ? "Roulette opens the wheel table." : "Blackjack uses the main Table rules.";
     if (runtime.rulesPanel) runtime.rulesPanel.innerHTML = "";
     return;
   }
@@ -1209,6 +1635,11 @@ function spinSelected() {
   const machine = runtime.seated;
   if (!machine || runtime.spinning) return;
   runtime.resultBox.classList.remove("staff");
+  if (runtime.securityLocked?.()) {
+    runtime.resultBox.classList.add("staff");
+    runtime.resultBox.textContent = runtime.securityLockReason?.() || "Security has blocked floor play.";
+    return;
+  }
   const denom = Number(runtime.denomSelect.value || 1);
   const lines = Math.min(Number(runtime.paylineSelect.value || 1), machine.maxLines);
   const wager = denom * lines;
@@ -1234,6 +1665,7 @@ function spinSelected() {
     machine.progressiveTotal += Math.max(1, Math.round(wager * (machine.progressiveType === "WAP" ? 0.12 : 0.08)));
   }
   const result = generateSpin(machine, lines, denom, isFreeSpin);
+  const securityNotice = maybeTriggerPlayerSecurity(machine, wager, isFreeSpin);
   animateReels(machine, result, () => {
     if (machine.progressiveType && result.progressiveWin) {
       result.win += machine.progressiveTotal;
@@ -1245,9 +1677,10 @@ function spinSelected() {
       machine.freeSpinLock = { denom, lines, wager };
     }
     runtime.commitBankroll(result.win);
+    const luckNotice = result.luckText ? ` ${result.luckText}` : "";
     const feature = result.awardedFreeSpins ? ` Awarded ${result.awardedFreeSpins} free spins.` : result.featureText ? ` ${result.featureText}` : "";
     const net = isFreeSpin ? result.win : result.win - wager;
-    runtime.resultBox.textContent = result.win ? `Won ${chips(result.win)} on ${result.hits.length} line(s)${result.progressiveWin ? " plus progressive" : ""}. Net ${chips(net)}.${feature}${tamperNotice}` : `No hit. ${isFreeSpin ? "Free spin used." : `Lost ${chips(wager)}.`}${feature}${tamperNotice}`;
+    runtime.resultBox.textContent = result.win ? `Won ${chips(result.win)} on ${result.hits.length} line(s)${result.progressiveWin ? " plus progressive" : ""}. Net ${chips(net)}.${feature}${luckNotice}${tamperNotice}${securityNotice}` : `No hit. ${isFreeSpin ? "Free spin used." : `Lost ${chips(wager)}.`}${feature}${luckNotice}${tamperNotice}${securityNotice}`;
     runtime.spinHistory.unshift({ machine: machine.name, wager: isFreeSpin ? 0 : wager, win: result.win });
     runtime.spinHistory = runtime.spinHistory.slice(0, 5);
     runtime.historyBox.innerHTML = runtime.spinHistory.map((item) => `<p><strong>${escapeHtml(item.machine)}</strong> bet ${chips(item.wager)} won ${chips(item.win)}</p>`).join("");
@@ -1328,8 +1761,8 @@ function generateSpin(machine, activeLines, denom, isFreeSpin = false) {
   const scatterSymbols = grid.flat().filter((symbol) => symbol === "BONUS" || symbol === "FREE" || symbol === "COIN").length;
   const featureRoll = rng();
   const nameBoost = /jackpot|dragon|moon|vault|lucky/i.test(machine.name) ? 0.04 : 0;
-  const freeSpinTriggered = scatterSymbols >= 3 || (machine.gameType === "freeSpins" && featureRoll < 0.22 + nameBoost) || (["bonus", "megaways", "cascading", "sap", "wap"].includes(machine.gameType) && featureRoll < 0.08 + nameBoost);
-  const awardedFreeSpins = freeSpinTriggered && ["bonus", "freeSpins", "megaways", "cascading", "wap", "sap"].includes(machine.gameType) ? Math.max(5, scatterSymbols * 2) : 0;
+  const freeSpinTriggered = scatterSymbols >= 3 || (machine.gameType === "freeSpins" && featureRoll < 0.22 + nameBoost) || (["bonus", "megaways", "cascading", "stickyWilds", "walkingWilds", "sap", "wap"].includes(machine.gameType) && featureRoll < 0.08 + nameBoost);
+  const awardedFreeSpins = freeSpinTriggered && ["bonus", "freeSpins", "megaways", "cascading", "stickyWilds", "walkingWilds", "wap", "sap"].includes(machine.gameType) ? Math.max(5, scatterSymbols * 2) : 0;
   let featureText = "";
   if (machine.gameType === "multiplier" && hits.length) {
     win *= machine.featureMultiplier;
@@ -1379,12 +1812,77 @@ function generateSpin(machine, activeLines, denom, isFreeSpin = false) {
     win += wildWin;
     featureText = `Expanding wild feature paid ${chips(wildWin)}.`;
   }
+  if (machine.gameType === "stickyWilds" && (freeSpinTriggered || (isFreeSpin && featureRoll < 0.32))) {
+    const stickyWin = denom * activeLines * (isFreeSpin ? 10 : 7);
+    win += stickyWin;
+    featureText = `Sticky wilds held through the bonus for ${chips(stickyWin)}.`;
+  }
+  if (machine.gameType === "symbolCollector" && (scatterSymbols || featureRoll < 0.26 + nameBoost)) {
+    const collected = scatterSymbols + 2 + Math.floor(rng() * 4);
+    const collectorWin = denom * collected * (4 + Math.floor(activeLines / 3));
+    win += collectorWin;
+    featureText = `Collector meter banked ${collected} symbols for ${chips(collectorWin)}.`;
+  }
+  if (machine.gameType === "walkingWilds" && (hits.length || featureRoll < 0.22 + nameBoost)) {
+    const steps = 1 + Math.floor(rng() * 3);
+    const walkingWin = denom * activeLines * steps * 4;
+    win += walkingWin;
+    featureText = `${steps} walking wild step${steps === 1 ? "" : "s"} paid ${chips(walkingWin)}.`;
+  }
+  if (machine.gameType === "nudgeReels" && (hits.length || featureRoll < 0.28 + nameBoost)) {
+    const nudgeWin = denom * (activeLines + 2) * (2 + Math.floor(rng() * 5));
+    win += nudgeWin;
+    featureText = `Reel nudge converted a near miss for ${chips(nudgeWin)}.`;
+  }
+  if (machine.gameType === "cashLadder" && featureRoll < 0.2 + nameBoost) {
+    const steps = 1 + Math.floor(rng() * 5);
+    const ladderWin = denom * activeLines * steps * 5;
+    win += ladderWin;
+    featureText = `Cash ladder climbed ${steps} step${steps === 1 ? "" : "s"} for ${chips(ladderWin)}.`;
+  }
+  if (machine.gameType === "linkedRespins" && (scatterSymbols >= 2 || featureRoll < 0.18 + nameBoost)) {
+    const coins = Math.max(2, scatterSymbols + Math.floor(rng() * 4));
+    const linkedWin = denom * activeLines * coins * 6;
+    win += linkedWin;
+    featureText = `Linked respins held ${coins} coin symbols for ${chips(linkedWin)}.`;
+  }
   if (isFreeSpin && win > 0) {
     win = Math.round(win * 1.5);
     featureText = `${featureText} Free spin boost applied.`.trim();
   }
+  let luckText = "";
+  const luckBoost = Math.max(0, Number(runtime.slotLuckBoost?.() || 0));
+  if (luckBoost > 0) {
+    if (win > 0) {
+      const boost = Math.max(1, Math.round(win * (luckBoost / 100)));
+      win += boost;
+      luckText = `Alcohol luck nudged the payout by ${chips(boost)}.`;
+    } else if (rng() < luckBoost / 140) {
+      const saveWin = denom * Math.max(1, Math.ceil(activeLines * 0.4));
+      win += saveWin;
+      luckText = `Alcohol luck turned a cold spin into ${chips(saveWin)}.`;
+    }
+  }
   const progressiveWin = Boolean(machine.progressiveType && hits.some((hit) => hit.base === "WILD" && hit.count >= machine.reels));
-  return { grid, hits, win, progressiveWin, awardedFreeSpins, featureText };
+  return { grid, hits, win, progressiveWin, awardedFreeSpins, featureText, luckText };
+}
+
+function maybeTriggerPlayerSecurity(machine, wager, isFreeSpin) {
+  const now = performance.now();
+  if (now - runtime.lastSecurityIncidentAt < 9000) return "";
+  const intox = Number(runtime.playerIntoxication?.() || 0);
+  const heat = Number(runtime.securityHeat?.() || 0);
+  const baseRisk = intox > 55 ? (intox - 50) / 700 : 0;
+  const wagerRisk = !isFreeSpin ? Math.min(0.04, wager / Math.max(5000, Number(runtime.getBankroll?.() || 5000)) * 0.05) : 0;
+  const risk = baseRisk + heat / 1200 + wagerRisk + (machine.staffIncidents ? 0.025 : 0);
+  if (Math.random() > risk) return "";
+  runtime.lastSecurityIncidentAt = now;
+  const kind = intox > 82 && Math.random() < 0.45 ? "blackout" : "eject";
+  const message = kind === "blackout"
+    ? " Security sees you swaying at the cabinet. You black out and wake up off the floor."
+    : " Security jumps in, drags an overserved guest to the security doors, and logs the machine.";
+  runtime.onSecurityIncident?.(kind, { message: message.trim(), machine: machine.name, wager, intoxication: intox });
+  return message;
 }
 
 function updateProgressiveLabel(machine) {
@@ -1434,11 +1932,25 @@ function buildMachine(THREE, group, machine, localX, localZ) {
   cabinet.add(body);
 
   const screen = new THREE.Mesh(
-    new THREE.BoxGeometry(0.92, machine.style === "physical" ? 0.5 : 0.72, 0.06),
+    new THREE.BoxGeometry(machine.cabinetVariant === "doubleScreen" ? 1.0 : 0.92, machine.style === "physical" ? 0.5 : 0.72, 0.06),
     new THREE.MeshStandardMaterial({ color: machine.color, emissive: machine.color, emissiveIntensity: 0.62 })
   );
   screen.position.set(0, 1.38, 0.43);
   cabinet.add(screen);
+  registerAnimated(screen, "pulse", group.userData.chunkKey, 1.1 + (hash(machine.id) % 7) / 10, hash(machine.name));
+
+  if (machine.style === "physical") {
+    for (let i = 0; i < machine.reels; i++) {
+      const reel = new THREE.Mesh(
+        new THREE.CylinderGeometry(0.12, 0.12, 0.08, 18),
+        new THREE.MeshStandardMaterial({ color: 0xf8fafc, roughness: 0.22, metalness: 0.08 })
+      );
+      reel.rotation.z = Math.PI / 2;
+      reel.position.set(-0.28 + i * (0.56 / Math.max(1, machine.reels - 1)), 1.38, 0.49);
+      cabinet.add(reel);
+      registerAnimated(reel, "spin", group.userData.chunkKey, 0.35 + i * 0.08, i);
+    }
+  }
 
   const panel = new THREE.Mesh(
     new THREE.BoxGeometry(0.82, 0.3, 0.08),
@@ -1448,11 +1960,15 @@ function buildMachine(THREE, group, machine, localX, localZ) {
   cabinet.add(panel);
 
   const topper = new THREE.Mesh(
-    new THREE.BoxGeometry(machine.progressiveType ? 1.15 : 0.9, machine.progressiveType ? 0.36 : 0.22, 0.52),
+    machine.cabinetVariant === "curved"
+      ? new THREE.CylinderGeometry(machine.progressiveType ? 0.62 : 0.48, machine.progressiveType ? 0.62 : 0.48, 0.3, 22)
+      : new THREE.BoxGeometry(machine.progressiveType ? 1.15 : 0.9, machine.progressiveType ? 0.36 : 0.22, 0.52),
     new THREE.MeshStandardMaterial({ color: machine.color, emissive: machine.color, emissiveIntensity: 0.35 })
   );
   topper.position.set(0, 2.28, 0.02);
+  if (machine.cabinetVariant === "curved") topper.rotation.z = Math.PI / 2;
   cabinet.add(topper);
+  registerAnimated(topper, machine.progressiveType ? "bounce" : "pulse", group.userData.chunkKey, 0.75, hash(machine.id) % 100);
 
   const base = new THREE.Mesh(
     new THREE.BoxGeometry(1.3, 0.35, 0.96),
@@ -1478,6 +1994,27 @@ function buildMachine(THREE, group, machine, localX, localZ) {
   const rightLight = leftLight.clone();
   rightLight.position.x = 0.66;
   cabinet.add(rightLight);
+
+  const lever = new THREE.Mesh(
+    new THREE.CylinderGeometry(0.035, 0.035, 0.52, 10),
+    new THREE.MeshStandardMaterial({ color: 0xd99a18, metalness: 0.55, roughness: 0.28 })
+  );
+  lever.position.set(0.77, 1.05, 0.24);
+  lever.rotation.z = -0.35;
+  cabinet.add(lever);
+  const knob = new THREE.Mesh(new THREE.SphereGeometry(0.11, 12, 12), new THREE.MeshStandardMaterial({ color: 0xef4444, roughness: 0.28 }));
+  knob.position.set(0.86, 1.25, 0.24);
+  cabinet.add(knob);
+
+  if (machine.cabinetVariant === "tower" || machine.progressiveType) {
+    const fins = new THREE.Mesh(
+      new THREE.BoxGeometry(1.55, 0.08, 0.12),
+      new THREE.MeshBasicMaterial({ color: machine.color, transparent: true, opacity: 0.72 })
+    );
+    fins.position.set(0, 2.55, 0.05);
+    cabinet.add(fins);
+    registerAnimated(fins, "pulse", group.userData.chunkKey, 1.3, hash(machine.name) % 60);
+  }
 
   let label = null;
   if (machine.progressiveType) {
@@ -1963,7 +2500,7 @@ function slotRulesMarkup(machine) {
   return `
     <div class="slot-rules-panel">
       <h3>${escapeHtml(machine.name)} Rules</h3>
-      <p>${escapeHtml(machine.theme)}. ${machine.gameType} game with ${machine.reels} reels and up to ${machine.maxLines} paylines.</p>
+      <p>${escapeHtml(machine.theme)}. ${escapeHtml(machine.featureTitle || machine.gameType)} game with ${machine.reels} reels and up to ${machine.maxLines} paylines.</p>
       <p>Three or more matching symbols from the left pay. WILD substitutes for line wins. BONUS, FREE, or COIN scatters can award features.</p>
       <p><strong>Features:</strong> ${featureDescription(machine)}</p>
       ${progressive}
@@ -1986,6 +2523,12 @@ function featureDescription(machine) {
     wheelBonus: "Feature spins can launch a wheel bonus with a random multiplier slice.",
     pickBonus: "Feature spins can open a pick-a-prize mini game.",
     expandingWilds: "Wild features can expand across reels for extra pays.",
+    stickyWilds: "Wilds can stick through free spins, making bonus rounds more explosive.",
+    symbolCollector: "Scatter and premium symbols fill a collector meter that pays credit awards.",
+    walkingWilds: "Wilds can step across reels and create repeat pays.",
+    nudgeReels: "Near misses can nudge into place on classic reel banks.",
+    cashLadder: "Bonus rolls climb a ladder with larger awards at higher steps.",
+    linkedRespins: "Coin symbols can hold for linked-respin awards fed by nearby cabinets.",
     sap: "Standalone progressive jackpot fed by this cabinet only.",
     wap: "Wide area progressive jackpot linked to multiple generated cabinets.",
   };
@@ -1998,7 +2541,7 @@ function progressiveChance(machine) {
 }
 
 function paylineOptions(maxLines) {
-  return [1, 3, 5, 9, 15, 20, 25].filter((line) => line <= maxLines).map((line) => `<option value="${line}">${line} line${line === 1 ? "" : "s"}</option>`).join("");
+  return [1, 3, 5, 9, 10, 15, 20, 25, 40].filter((line) => line <= maxLines).map((line) => `<option value="${line}">${line} line${line === 1 ? "" : "s"}</option>`).join("");
 }
 
 function linePatterns(reels) {
@@ -2019,6 +2562,10 @@ function linePatterns(reels) {
     Array.from({ length: reels }, (_, i) => i % 2),
     Array.from({ length: reels }, (_, i) => 2 - (i % 2)),
   ];
+  while (patterns.length < 40) {
+    const seed = patterns.length;
+    patterns.push(Array.from({ length: reels }, (_, i) => Math.abs((seed + i * 2) % 5 - 2) % 3));
+  }
   return patterns;
 }
 

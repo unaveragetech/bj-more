@@ -14,8 +14,8 @@ import {
 } from "./game.js?v=6";
 import { askOllama, bankPrompt, coachPrompt, listOllamaModels, outcomePrompt, defaultBankPrompt, defaultCoachPrompt } from "./ollama.js?v=3";
 import { basicStrategy, explainStrategy, professionalStrategy } from "./strategy.js?v=4";
-import { initSlotsWorld, destroySlotsWorld, updateSlotsAvatar, updateSlotsPeers, triggerSlotsEmote } from "./slots.js?v=20";
-import { loadLab, resetLab, saveLab } from "./storage.js?v=20";
+import { initSlotsWorld, destroySlotsWorld, updateSlotsAvatar, updateSlotsPeers, triggerSlotsEmote } from "./slots.js?v=22";
+import { loadLab, resetLab, saveLab } from "./storage.js?v=21";
 import { initNetwork, connectServer, disconnectServer, createRoom, joinRoom, leaveRoom, sendNetworkBet, sendNetworkAction, sendNetworkChat, sendNetworkAvatar, sendSlotEnter, sendSlotState, sendSlotLeave, validateServerUrl } from "./network.js?v=4";
 
 let lab = loadLab();
@@ -33,6 +33,12 @@ const BOT_NAMES = ["Mara", "Rico", "Jules", "Rin", "Tess", "Noor", "Cal", "Ivy",
 
 function randomRange(min, max) {
   return Math.floor(Math.random() * (max - min + 1)) + min;
+}
+
+function secureRandomInt(maxExclusive) {
+  const buffer = new Uint32Array(1);
+  crypto.getRandomValues(buffer);
+  return buffer[0] % maxExclusive;
 }
 
 function ensureTablePlayersInfo() {
@@ -307,6 +313,7 @@ function render() {
   else if (lab.activeView === "auto") renderAuto();
   else if (lab.activeView === "slots") renderSlots();
   else if (lab.activeView === "keno") renderKeno();
+  else if (lab.activeView === "roulette") renderRoulette();
   else if (lab.activeView === "multiplayer") renderMultiplayer();
   else renderTable();
   saveLab(lab);
@@ -528,7 +535,7 @@ function canUseTable() {
   if (isMultiplayerSession()) {
     return true;
   }
-  return lab.drink.thirst > 0 && !hardBlockedByLoan();
+  return lab.drink.thirst > 0 && !hardBlockedByLoan() && !securityLocked();
 }
 
 function chatPanelMarkup(room) {
@@ -555,6 +562,7 @@ function tableBlockReason() {
     if (!isMultiplayerRoom()) return "Join a room before playing.";
   }
   if (lab.drink.thirst <= 0) return "You are too thirsty to keep playing. Visit the Drink Server.";
+  if (securityLocked()) return securityLockReason();
   if (hardBlockedByLoan()) return "The teller has frozen table action until an overdue loan is repaid.";
   return "";
 }
@@ -666,6 +674,8 @@ function renderSlots() {
       <div class="top-stats">
         ${metric("Bankroll", chips(lab.bankroll))}
         ${metric("Slot lobby", isMultiplayerConnected() ? `${remoteSlotPlayers().length + 1} online` : "Local")}
+        ${metric("Slot luck", slotLuckBoost() ? `+${slotLuckBoost().toFixed(1)}%` : "none")}
+        ${metric("Security", securityLocked() ? "Hold" : `${Math.round(lab.security.heat || 0)} heat`)}
         ${metric("ATM", chips(lab.bank.atm.balance))}
         ${metric("Clock", casinoClock())}
       </div>
@@ -751,6 +761,20 @@ function renderSlots() {
       toast(`${table.name}: seated at blackjack.`, "good");
       render();
     },
+    onRouletteTable: (table) => {
+      lab.activeView = "roulette";
+      toast(`${table.name}: seated at roulette.`, "good");
+      render();
+    },
+    securityLocked,
+    securityLockReason,
+    slotLuckBoost,
+    playerIntoxication: () => lab.drink.intoxication || 0,
+    securityHeat: () => lab.security.heat || 0,
+    onSecurityIncident: (kind, detail) => {
+      applySecurityIncident(kind, detail);
+      render();
+    },
     onPresence: (state, reason) => {
       if (!isMultiplayerConnected()) return;
       const payload = {
@@ -787,6 +811,148 @@ function bindSlotEmotes() {
   document.querySelectorAll("[data-slot-emote]").forEach((button) => {
     button.addEventListener("click", () => triggerSlotsEmote(button.dataset.slotEmote));
   });
+}
+
+function renderRoulette() {
+  updateServices();
+  const last = lab.roulette.lastSpin;
+  app.innerHTML = `
+    <section class="topbar">
+      <div>
+        <p class="eyebrow">Wheel table</p>
+        <h1>Roulette</h1>
+        <p class="runtime-badge">Bet red/black, odd/even, high/low, or a straight number. The wheel pays immediately.</p>
+      </div>
+      <div class="top-stats">${metric("Bankroll", chips(lab.bankroll))}${metric("Alcohol", `${Math.round(lab.drink.intoxication || 0)}%`)}${metric("Security", securityLocked() ? "Hold" : "Clear")}${metric("Last", last ? `${last.number} ${last.color}` : "-")}</div>
+    </section>
+    <section class="roulette-layout">
+      <article class="roulette-wheel-card">
+        <div class="roulette-wheel ${last?.color || "green"}">
+          <span>${last ? last.number : "0"}</span>
+          <i></i>
+        </div>
+        <div class="roulette-result ${last?.net > 0 ? "win" : last ? "lose" : ""}">
+          ${last ? `${escapeHtml(last.label)} landed ${last.number} ${last.color}. Net ${chips(last.net)}.` : "Choose a wager and spin the wheel."}
+        </div>
+      </article>
+      <aside class="control-panel">
+        ${serviceNoticeMarkup()}
+        <h2>Roulette Wager</h2>
+        <label>Bet type
+          <select id="rouletteType">
+            ${rouletteBetOptions().map((item) => `<option value="${item.id}" ${lab.roulette.betType === item.id ? "selected" : ""}>${item.label}</option>`).join("")}
+          </select>
+        </label>
+        <label>Straight number <input id="rouletteNumber" type="number" min="0" max="36" value="${lab.roulette.number || 0}"></label>
+        <label>Bet amount <input id="rouletteAmount" type="number" min="${lab.rules.minBet}" max="${lab.rules.maxBet}" value="${lab.roulette.amount || 25}"></label>
+        <p class="fine">${rouletteBetDescription(lab.roulette.betType)} Straight number pays 35:1. Outside bets pay 1:1.</p>
+        <div class="button-row">
+          <button id="rouletteSpin" class="primary" ${canUseTable() ? "" : "disabled"}>Spin roulette</button>
+          <button id="rouletteToSlots">Back to Slots</button>
+        </div>
+        <h3>Wheel Layout</h3>
+        <div class="roulette-number-grid">
+          ${Array.from({ length: 37 }, (_, n) => `<span class="${rouletteColor(n)}">${n}</span>`).join("")}
+        </div>
+        <h3>History</h3>
+        <div class="keno-history">
+          ${lab.roulette.history.length ? lab.roulette.history.slice(0, 10).map((item) => `<div class="history-row ${item.net > 0 ? "win" : "lose"}"><strong>${item.number} ${escapeHtml(item.color)}</strong><span>${escapeHtml(item.label)} | net ${chips(item.net)}</span><small>${new Date(item.at).toLocaleString()}</small></div>`).join("") : `<p class="fine">No roulette spins yet.</p>`}
+        </div>
+      </aside>
+    </section>
+  `;
+  bindRouletteActions();
+}
+
+function rouletteBetOptions() {
+  return [
+    { id: "red", label: "Red" },
+    { id: "black", label: "Black" },
+    { id: "odd", label: "Odd" },
+    { id: "even", label: "Even" },
+    { id: "low", label: "1-18" },
+    { id: "high", label: "19-36" },
+    { id: "straight", label: "Straight number" },
+  ];
+}
+
+function rouletteBetDescription(type) {
+  const map = {
+    red: "Red wins on any red number from 1-36.",
+    black: "Black wins on any black number from 1-36.",
+    odd: "Odd wins on odd numbers from 1-36.",
+    even: "Even wins on even numbers from 1-36.",
+    low: "Low wins on 1 through 18.",
+    high: "High wins on 19 through 36.",
+    straight: "Straight wins only if the exact number lands.",
+  };
+  return map[type] || map.red;
+}
+
+function bindRouletteActions() {
+  document.querySelector("#rouletteType")?.addEventListener("change", (event) => {
+    lab.roulette.betType = event.target.value;
+    saveLab(lab);
+    render();
+  });
+  document.querySelector("#rouletteNumber")?.addEventListener("change", (event) => {
+    lab.roulette.number = clamp(Number(event.target.value || 0), 0, 36);
+    saveLab(lab);
+  });
+  document.querySelector("#rouletteAmount")?.addEventListener("change", (event) => {
+    lab.roulette.amount = Math.max(lab.rules.minBet, Number(event.target.value || 1));
+    saveLab(lab);
+  });
+  document.querySelector("#rouletteToSlots")?.addEventListener("click", () => {
+    lab.activeView = "slots";
+    render();
+  });
+  document.querySelector("#rouletteSpin")?.addEventListener("click", () => spinRoulette());
+}
+
+function spinRoulette() {
+  updateServices();
+  if (!canUseTable()) return toast(tableBlockReason() || "Roulette is locked.", "bad");
+  const amount = Math.max(lab.rules.minBet, Number(document.querySelector("#rouletteAmount")?.value || lab.roulette.amount || 1));
+  if (lab.bankroll < amount) return toast("Not enough bankroll for that roulette bet.", "bad");
+  const type = document.querySelector("#rouletteType")?.value || lab.roulette.betType || "red";
+  const pick = clamp(Number(document.querySelector("#rouletteNumber")?.value || lab.roulette.number || 0), 0, 36);
+  const number = secureRandomInt(37);
+  const color = rouletteColor(number);
+  const won = rouletteWin(type, pick, number, color);
+  const payout = won ? amount * (type === "straight" ? 36 : 2) : 0;
+  const net = payout - amount;
+  lab.bankroll += net;
+  drainThirst(amount, "deal");
+  lab.security.heat = clamp(Number(lab.security.heat || 0) + (amount / Math.max(500, lab.bankroll + amount)) * 8, 0, 100);
+  lab.roulette = {
+    ...lab.roulette,
+    betType: type,
+    number: pick,
+    amount,
+    lastSpin: { at: new Date().toISOString(), type, pick, amount, number, color, payout, net, label: rouletteBetOptions().find((item) => item.id === type)?.label || type },
+  };
+  lab.roulette.history.unshift(lab.roulette.lastSpin);
+  lab.roulette.history = lab.roulette.history.slice(0, 60);
+  if ((lab.drink.intoxication || 0) > 80 && Math.random() < 0.08) applySecurityIncident("eject", { source: "roulette", message: "Security removed you from roulette for being overserved at the table." });
+  render();
+}
+
+function rouletteWin(type, pick, number, color) {
+  if (number === 0) return type === "straight" && pick === 0;
+  if (type === "straight") return number === pick;
+  if (type === "red" || type === "black") return color === type;
+  if (type === "odd") return number % 2 === 1;
+  if (type === "even") return number % 2 === 0;
+  if (type === "low") return number >= 1 && number <= 18;
+  if (type === "high") return number >= 19 && number <= 36;
+  return false;
+}
+
+function rouletteColor(number) {
+  if (number === 0) return "green";
+  const red = new Set([1,3,5,7,9,12,14,16,18,19,21,23,25,27,30,32,34,36]);
+  return red.has(number) ? "red" : "black";
 }
 
 function remoteSlotPlayers() {
@@ -1251,7 +1417,12 @@ function updateServices() {
   const minutes = Math.max(0, (Date.now() - last) / 60000);
   if (minutes > 0.1) {
     lab.drink.thirst = clamp(lab.drink.thirst - minutes * 0.35, 0, 100);
+    lab.drink.intoxication = clamp(Number(lab.drink.intoxication || 0) - minutes * 2.2, 0, 100);
     lab.drink.lastTickAt = new Date().toISOString();
+  }
+  if (lab.drink.luckBoostUntil && Date.now() > new Date(lab.drink.luckBoostUntil).getTime()) {
+    lab.drink.luckBoostUntil = "";
+    lab.drink.luckBoostPercent = 0;
   }
   lab.bank.notifications = bankNotifications();
 }
@@ -1288,6 +1459,44 @@ function hardBlockedByLoan() {
   return lab.bank.loans.some((loan) => loan.status === "active" && now - new Date(loan.dueAt).getTime() > 10 * 60000);
 }
 
+function securityLocked() {
+  const now = casinoNow().getTime();
+  return ["blackoutUntil", "ejectedUntil"].some((key) => lab.security?.[key] && new Date(lab.security[key]).getTime() > now);
+}
+
+function securityLockReason() {
+  const now = casinoNow().getTime();
+  const blackout = lab.security?.blackoutUntil ? new Date(lab.security.blackoutUntil).getTime() - now : 0;
+  const ejected = lab.security?.ejectedUntil ? new Date(lab.security.ejectedUntil).getTime() - now : 0;
+  const wait = Math.max(blackout, ejected);
+  const minutes = Math.max(1, Math.ceil(wait / 60000));
+  if (blackout > ejected) return `You blacked out. Wait ${minutes} minute${minutes === 1 ? "" : "s"} or reset the lab.`;
+  if (ejected > 0) return `Security removed you from the floor. Wait ${minutes} minute${minutes === 1 ? "" : "s"} or reset the lab.`;
+  return "";
+}
+
+function slotLuckBoost() {
+  if (lab.drink.luckBoostUntil && Date.now() > new Date(lab.drink.luckBoostUntil).getTime()) {
+    lab.drink.luckBoostUntil = "";
+    lab.drink.luckBoostPercent = 0;
+  }
+  return lab.drink.luckBoostUntil && new Date(lab.drink.luckBoostUntil).getTime() > Date.now()
+    ? Number(lab.drink.luckBoostPercent || 0)
+    : 0;
+}
+
+function applySecurityIncident(kind, detail = {}) {
+  const now = casinoNow();
+  const minutes = kind === "blackout" ? 8 + Math.floor(Math.random() * 6) : kind === "eject" ? 5 + Math.floor(Math.random() * 8) : 0;
+  if (kind === "blackout") lab.security.blackoutUntil = new Date(now.getTime() + minutes * 60000).toISOString();
+  if (kind === "eject") lab.security.ejectedUntil = new Date(now.getTime() + minutes * 60000).toISOString();
+  lab.security.lastIncident = detail.message || (kind === "blackout" ? "You blacked out and woke up away from the machines." : "Security dragged a guest to the security doors.");
+  lab.security.incidents.unshift({ at: new Date().toISOString(), kind, minutes, ...detail });
+  lab.security.incidents = lab.security.incidents.slice(0, 40);
+  lab.security.heat = kind === "warning" ? clamp(Number(lab.security.heat || 0) + 8, 0, 100) : Math.max(0, Number(lab.security.heat || 0) - 20);
+  saveLab(lab);
+}
+
 function activeDebt() {
   return lab.bank.loans.filter((loan) => loan.status === "active").reduce((sum, loan) => sum + Number(loan.balance || 0), 0);
 }
@@ -1305,6 +1514,10 @@ function bankNotifications() {
   }
   if (lab.drink.thirst <= 0) notices.push({ kind: "bad", title: "Drink required", body: "You must buy a drink before continuing play." });
   else if (lab.drink.thirst < 20) notices.push({ kind: "warn", title: "Drink meter low", body: "Visit the Drink Server soon or table play will stop." });
+  if (lab.drink.intoxication > 70) notices.push({ kind: "warn", title: "Overserved", body: `Alcohol meter ${Math.round(lab.drink.intoxication)}%. Blackout or security removal risk is high.` });
+  if (slotLuckBoost()) notices.push({ kind: "good", title: "Slot luck active", body: `Alcohol luck edge is +${slotLuckBoost().toFixed(1)}% for slots only.` });
+  if (securityLocked()) notices.push({ kind: "bad", title: "Security hold", body: securityLockReason() });
+  else if (lab.security?.lastIncident) notices.push({ kind: "warn", title: "Security floor note", body: lab.security.lastIncident });
   if (lab.bank.trust < 35) notices.push({ kind: "warn", title: "Low bank trust", body: `Trust score is ${lab.bank.trust}%. Repaying loans on time will help Jessup approve more requests.` });
   else if (lab.bank.trust > 75) notices.push({ kind: "good", title: "Trusted borrower", body: `Trust score is ${lab.bank.trust}%. The bank is more likely to offer favorable terms.` });
   if (!notices.length) notices.push({ kind: "good", title: "Table clear", body: "No teller holds. Drink meter is acceptable." });
@@ -1367,7 +1580,7 @@ function renderDrinks() {
   app.innerHTML = `
     <section class="topbar">
       <div><p class="eyebrow">Drink server</p><h1>Refreshments</h1><p class="runtime-badge">Thirst drains faster with larger bets, risky moves, and faster play.</p></div>
-      <div class="top-stats">${metric("Thirst", `${Math.round(lab.drink.thirst)}%`)}${metric("Bankroll", chips(lab.bankroll))}${metric("Play status", canUseTable() ? "Ready" : "Blocked")}</div>
+      <div class="top-stats">${metric("Thirst", `${Math.round(lab.drink.thirst)}%`)}${metric("Alcohol", `${Math.round(lab.drink.intoxication || 0)}%`)}${metric("Slot luck", slotLuckBoost() ? `+${slotLuckBoost().toFixed(1)}%` : "none")}${metric("Bankroll", chips(lab.bankroll))}${metric("Play status", canUseTable() ? "Ready" : "Blocked")}</div>
     </section>
     <section class="drink-meter-wrap">
       <div class="drink-meter"><i style="width:${clamp(lab.drink.thirst, 0, 100)}%"></i></div>
@@ -1376,8 +1589,9 @@ function renderDrinks() {
     <section class="drink-grid">
       ${drinkMenu().map((drink) => `
         <article class="drink-card">
-          <h2>${drink.name}</h2>
+          <div class="drink-card-head"><h2>${drink.name}</h2>${drink.tag ? `<span class="drink-tag">${escapeHtml(drink.tag)}</span>` : ""}</div>
           <p>${drink.description}</p>
+          ${drink.effect ? `<small>${escapeHtml(drink.effect)}</small>` : ""}
           <strong>${chips(drink.cost)}</strong>
           <button data-drink="${drink.id}" class="primary">Buy and drink +${drink.refill}%</button>
         </article>
@@ -1666,6 +1880,13 @@ function buyDrink(id) {
   if (lab.bankroll < drink.cost) return toast("Not enough bankroll for that drink.", "bad");
   lab.bankroll -= drink.cost;
   lab.drink.thirst = clamp(lab.drink.thirst + drink.refill, 0, 100);
+  if (drink.alcohol) {
+    lab.drink.intoxication = clamp(Number(lab.drink.intoxication || 0) + drink.alcohol, 0, 100);
+    lab.drink.luckBoostPercent = clamp(Math.max(Number(lab.drink.luckBoostPercent || 0), Number(drink.luck || 0)), 0, 8);
+    lab.drink.luckBoostUntil = new Date(Date.now() + (drink.luckMinutes || 8) * 60000).toISOString();
+    lab.security.heat = clamp(Number(lab.security.heat || 0) + Math.max(2, drink.alcohol / 3), 0, 100);
+    maybeAlcoholIncident(drink);
+  }
   lab.drink.lastTickAt = new Date().toISOString();
   lab.drink.purchases.unshift({ ...drink, at: new Date().toISOString() });
   lab.drink.purchases = lab.drink.purchases.slice(0, 30);
@@ -1675,11 +1896,35 @@ function buyDrink(id) {
 
 function drinkMenu() {
   return [
-    { id: "water", name: "Water", cost: 25, refill: 25, description: "Simple table water. Cheap and reliable." },
-    { id: "sparkling", name: "Fancy Water", cost: 75, refill: 45, description: "A cleaner refill with a little table presence." },
-    { id: "electrolyte", name: "Electrolyte Bottle", cost: 150, refill: 70, description: "Keeps longer sessions moving." },
-    { id: "reserve", name: "Reserve Mineral Water", cost: 300, refill: 100, description: "Full reset for serious sessions." },
+    { id: "water", name: "Water", cost: 25, refill: 25, tag: "basic", description: "Simple table water. Cheap and reliable.", effect: "Best for short sessions." },
+    { id: "sparkling", name: "Fancy Water", cost: 75, refill: 45, tag: "clean", description: "A cleaner refill with a little table presence.", effect: "Good value when the floor is moving fast." },
+    { id: "coffee", name: "Black Coffee", cost: 90, refill: 38, tag: "focus", description: "Bitter, hot, and fast from the back bar.", effect: "Pairs well with high-speed slot walks." },
+    { id: "tea", name: "Jasmine Tea", cost: 110, refill: 48, tag: "calm", description: "A slower drink for table-game patience.", effect: "Feels right before longer blackjack sessions." },
+    { id: "electrolyte", name: "Electrolyte Bottle", cost: 150, refill: 70, tag: "stamina", description: "Keeps longer sessions moving.", effect: "Efficient refill for auto-lab pacing." },
+    { id: "smoothie", name: "Fruit Smoothie", cost: 185, refill: 76, tag: "fresh", description: "Food court blend with a bigger refresh.", effect: "Solid middle tier for slot-floor loops." },
+    { id: "energy", name: "Casino Energy", cost: 225, refill: 84, tag: "fast", description: "A bright can from the server cart.", effect: "Expensive but quick when thirst is low." },
+    { id: "beer", name: "Draft Beer", cost: 140, refill: 42, alcohol: 18, luck: 1.5, luckMinutes: 7, tag: "luck +1.5", description: "A cheap pour from the back bar.", effect: "Small slot luck bump. Raises alcohol and security attention." },
+    { id: "wine", name: "House Wine", cost: 210, refill: 50, alcohol: 24, luck: 2.2, luckMinutes: 8, tag: "luck +2.2", description: "A lounge glass with a smoother edge.", effect: "Better slot luck, higher blackout risk if stacked." },
+    { id: "cocktail", name: "Neon Cocktail", cost: 320, refill: 62, alcohol: 34, luck: 3.4, luckMinutes: 9, tag: "luck +3.4", description: "Club-row drink that makes every cabinet look friendly.", effect: "Meaningful slot luck, but security watches overserved guests." },
+    { id: "vip-shot", name: "VIP Shot", cost: 500, refill: 55, alcohol: 48, luck: 5.0, luckMinutes: 6, tag: "luck +5", description: "The high-limit bad idea in a tiny glass.", effect: "Largest slot luck boost, largest chance to black out or get kicked out." },
+    { id: "mocktail", name: "Neon Mocktail", cost: 260, refill: 88, tag: "premium", description: "Club-row citrus with a glowing garnish.", effect: "Premium refill without going all the way to reserve." },
+    { id: "reserve", name: "Reserve Mineral Water", cost: 300, refill: 100, tag: "full", description: "Full reset for serious sessions.", effect: "Best emergency buy before thirst blocks play." },
+    { id: "highlimit", name: "High Limit Service", cost: 450, refill: 100, tag: "vip", description: "A polished tray from the high-limit lounge.", effect: "Costs more, looks better, resets thirst." },
   ];
+}
+
+function maybeAlcoholIncident(drink) {
+  const intox = Number(lab.drink.intoxication || 0);
+  if (intox < 60) return;
+  const risk = (intox - 55) / 100 + Number(drink.alcohol || 0) / 170 + Number(lab.security.heat || 0) / 280;
+  if (Math.random() > risk) return;
+  if (intox > 82 && Math.random() < 0.48) {
+    applySecurityIncident("blackout", { source: drink.name, message: `You pushed ${drink.name} too far and blacked out near the slots.` });
+    toast("Blackout: play is locked until the timer clears or you reset.", "bad");
+  } else {
+    applySecurityIncident("eject", { source: drink.name, message: `Security flagged you as overserved after ${drink.name} and removed you from the floor.` });
+    toast("Security removed you from the floor. Wait out the hold or reset.", "bad");
+  }
 }
 
 function emptyTableMarkup() {

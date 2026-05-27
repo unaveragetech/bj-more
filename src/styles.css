@@ -1354,9 +1354,116 @@ button:disabled {
 .drink-card {
   display: grid;
   gap: 8px;
+  position: relative;
+  overflow: hidden;
+}
+.drink-card::before {
+  content: "";
+  position: absolute;
+  inset: 0 0 auto;
+  height: 4px;
+  background: linear-gradient(90deg, #18b981, #d99a18, #06b6d4);
+}
+.drink-card-head {
+  display: flex;
+  align-items: start;
+  justify-content: space-between;
+  gap: 10px;
 }
 .drink-card h2, .drink-card p { margin: 0; }
 .drink-card p { color: #334155; }
+.drink-card small { color: #52657a; }
+.drink-tag {
+  border: 1px solid #d6e0eb;
+  border-radius: 999px;
+  padding: 3px 7px;
+  color: #405269;
+  background: #f8fbfd;
+  font-size: .68rem;
+  font-weight: 950;
+  text-transform: uppercase;
+  letter-spacing: .06em;
+  white-space: nowrap;
+}
+.roulette-layout {
+  display: grid;
+  grid-template-columns: minmax(320px, 1fr) 380px;
+  gap: 18px;
+}
+.roulette-wheel-card {
+  min-height: 520px;
+  display: grid;
+  place-items: center;
+  align-content: center;
+  gap: 18px;
+  border-radius: 8px;
+  background:
+    radial-gradient(circle at center, rgba(255,255,255,.08), rgba(16,24,32,.92) 56%),
+    linear-gradient(135deg, #064e3b, #101820);
+  border: 1px solid rgba(255,255,255,.12);
+  overflow: hidden;
+}
+.roulette-wheel {
+  position: relative;
+  width: min(420px, 70vw);
+  aspect-ratio: 1;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  color: #fff;
+  background: conic-gradient(#7f1d1d 0 10deg, #111827 10deg 20deg, #7f1d1d 20deg 30deg, #111827 30deg 40deg, #065f46 40deg 50deg, #111827 50deg 60deg, #7f1d1d 60deg 70deg, #111827 70deg 80deg, #7f1d1d 80deg 90deg, #111827 90deg 100deg, #7f1d1d 100deg 110deg, #111827 110deg 120deg, #7f1d1d 120deg 130deg, #111827 130deg 140deg, #7f1d1d 140deg 150deg, #111827 150deg 160deg, #7f1d1d 160deg 170deg, #111827 170deg 180deg, #7f1d1d 180deg 190deg, #111827 190deg 200deg, #7f1d1d 200deg 210deg, #111827 210deg 220deg, #7f1d1d 220deg 230deg, #111827 230deg 240deg, #7f1d1d 240deg 250deg, #111827 250deg 260deg, #7f1d1d 260deg 270deg, #111827 270deg 280deg, #7f1d1d 280deg 290deg, #111827 290deg 300deg, #7f1d1d 300deg 310deg, #111827 310deg 320deg, #7f1d1d 320deg 330deg, #111827 330deg 340deg, #7f1d1d 340deg 350deg, #065f46 350deg 360deg);
+  border: 14px solid #d99a18;
+  box-shadow: 0 30px 80px rgba(0,0,0,.34), inset 0 0 0 16px rgba(0,0,0,.28);
+  animation: rouletteIdle 10s linear infinite;
+}
+.roulette-wheel span {
+  width: 34%;
+  aspect-ratio: 1;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  background: #f8fafc;
+  color: #101820;
+  font-size: 3rem;
+  font-weight: 950;
+  box-shadow: inset 0 0 0 8px #d99a18;
+}
+.roulette-wheel i {
+  position: absolute;
+  top: 8%;
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  background: #fff;
+  box-shadow: 0 0 18px rgba(255,255,255,.85);
+}
+.roulette-result {
+  border-radius: 8px;
+  padding: 14px 18px;
+  background: rgba(255,255,255,.9);
+  font-weight: 900;
+}
+.roulette-result.win { color: #087345; }
+.roulette-result.lose { color: var(--red); }
+.roulette-number-grid {
+  display: grid;
+  grid-template-columns: repeat(6, 1fr);
+  gap: 6px;
+}
+.roulette-number-grid span {
+  display: grid;
+  place-items: center;
+  min-height: 32px;
+  border-radius: 8px;
+  color: #fff;
+  font-weight: 900;
+}
+.roulette-number-grid .red { background: #b91c1c; }
+.roulette-number-grid .black { background: #111827; }
+.roulette-number-grid .green { background: #047857; }
+@keyframes rouletteIdle {
+  to { transform: rotate(360deg); }
+}
 .strategy-lessons {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));

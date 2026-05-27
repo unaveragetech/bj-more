@@ -117,8 +117,25 @@ function defaultLab() {
     },
     drink: {
       thirst: 100,
+      intoxication: 0,
+      luckBoostUntil: "",
+      luckBoostPercent: 0,
       lastTickAt: new Date().toISOString(),
       purchases: [],
+    },
+    security: {
+      heat: 0,
+      blackoutUntil: "",
+      ejectedUntil: "",
+      lastIncident: "",
+      incidents: [],
+    },
+    roulette: {
+      betType: "red",
+      number: 7,
+      amount: 25,
+      lastSpin: null,
+      history: [],
     },
     auto: {
       running: false,
@@ -231,6 +248,14 @@ function normalizeLab(lab) {
   lab.bank.trust ??= defaults.bank.trust;
   lab.bank.trustHistory ??= [];
   lab.drink = { ...defaults.drink, ...(lab.drink || {}) };
+  lab.drink.intoxication = clamp(Number(lab.drink.intoxication || 0), 0, 100);
+  lab.drink.luckBoostPercent = clamp(Number(lab.drink.luckBoostPercent || 0), 0, 12);
+  lab.drink.luckBoostUntil = lab.drink.luckBoostUntil || "";
+  lab.security = { ...defaults.security, ...(lab.security || {}) };
+  lab.security.heat = clamp(Number(lab.security.heat || 0), 0, 100);
+  lab.security.incidents = Array.isArray(lab.security.incidents) ? lab.security.incidents : [];
+  lab.roulette = { ...defaults.roulette, ...(lab.roulette || {}) };
+  lab.roulette.history = Array.isArray(lab.roulette.history) ? lab.roulette.history : [];
   lab.rules.botBankrollMin = Math.max(0, Number(lab.rules.botBankrollMin ?? defaults.rules.botBankrollMin));
   lab.rules.botBankrollMax = Math.max(lab.rules.botBankrollMin, Number(lab.rules.botBankrollMax ?? defaults.rules.botBankrollMax));
   lab.tablePlayers = Math.max(1, Math.min(4, Number(lab.tablePlayers || defaults.tablePlayers)));
