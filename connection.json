@@ -1,10 +1,10 @@
 {
   "app": "blackjack-lab",
   "status": "online",
-  "httpUrl": "",
-  "wsUrl": "ws://localhost:9000",
+  "httpUrl": "https://81d3-72-230-146-53.ngrok-free.app",
+  "wsUrl": "wss://81d3-72-230-146-53.ngrok-free.app",
   "localWsUrl": "ws://localhost:9000",
   "port": 9000,
-  "source": "local",
-  "updatedAt": "2026-05-27T20:33:58.150Z"
+  "source": "ngrok-cli",
+  "updatedAt": "2026-05-27T21:39:39.939Z"
 }
