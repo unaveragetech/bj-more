@@ -322,6 +322,16 @@ h1 { margin: 0; font-size: clamp(2rem, 4vw, 3.7rem); line-height: 1; }
   font-weight: 950;
   text-align: center;
 }
+.slot-credit-chip {
+  margin: -2px 0 10px;
+  border-radius: 8px;
+  padding: 5px 8px;
+  background: rgba(255,255,255,.1);
+  color: #dbeafe;
+  font-size: .75rem;
+  font-weight: 900;
+  text-align: center;
+}
 .slot-reels {
   display: grid;
   gap: 7px;
@@ -1411,11 +1421,37 @@ button:disabled {
   display: grid;
   place-items: center;
   color: #fff;
-  background: conic-gradient(#7f1d1d 0 10deg, #111827 10deg 20deg, #7f1d1d 20deg 30deg, #111827 30deg 40deg, #065f46 40deg 50deg, #111827 50deg 60deg, #7f1d1d 60deg 70deg, #111827 70deg 80deg, #7f1d1d 80deg 90deg, #111827 90deg 100deg, #7f1d1d 100deg 110deg, #111827 110deg 120deg, #7f1d1d 120deg 130deg, #111827 130deg 140deg, #7f1d1d 140deg 150deg, #111827 150deg 160deg, #7f1d1d 160deg 170deg, #111827 170deg 180deg, #7f1d1d 180deg 190deg, #111827 190deg 200deg, #7f1d1d 200deg 210deg, #111827 210deg 220deg, #7f1d1d 220deg 230deg, #111827 230deg 240deg, #7f1d1d 240deg 250deg, #111827 250deg 260deg, #7f1d1d 260deg 270deg, #111827 270deg 280deg, #7f1d1d 280deg 290deg, #111827 290deg 300deg, #7f1d1d 300deg 310deg, #111827 310deg 320deg, #7f1d1d 320deg 330deg, #111827 330deg 340deg, #7f1d1d 340deg 350deg, #065f46 350deg 360deg);
+  background:
+    radial-gradient(circle at center, #101820 0 20%, transparent 21%),
+    conic-gradient(from -5deg, #047857 0 9.72deg, #7f1d1d 9.72deg 19.44deg, #111827 19.44deg 29.16deg, #7f1d1d 29.16deg 38.88deg, #111827 38.88deg 48.6deg, #7f1d1d 48.6deg 58.32deg, #111827 58.32deg 68.04deg, #7f1d1d 68.04deg 77.76deg, #111827 77.76deg 87.48deg, #7f1d1d 87.48deg 97.2deg, #111827 97.2deg 106.92deg, #7f1d1d 106.92deg 116.64deg, #111827 116.64deg 126.36deg, #7f1d1d 126.36deg 136.08deg, #111827 136.08deg 145.8deg, #7f1d1d 145.8deg 155.52deg, #111827 155.52deg 165.24deg, #7f1d1d 165.24deg 174.96deg, #111827 174.96deg 184.68deg, #7f1d1d 184.68deg 194.4deg, #111827 194.4deg 204.12deg, #7f1d1d 204.12deg 213.84deg, #111827 213.84deg 223.56deg, #7f1d1d 223.56deg 233.28deg, #111827 233.28deg 243deg, #7f1d1d 243deg 252.72deg, #111827 252.72deg 262.44deg, #7f1d1d 262.44deg 272.16deg, #111827 272.16deg 281.88deg, #7f1d1d 281.88deg 291.6deg, #111827 291.6deg 301.32deg, #7f1d1d 301.32deg 311.04deg, #111827 311.04deg 320.76deg, #7f1d1d 320.76deg 330.48deg, #111827 330.48deg 340.2deg, #7f1d1d 340.2deg 349.92deg, #111827 349.92deg 360deg);
   border: 14px solid #d99a18;
   box-shadow: 0 30px 80px rgba(0,0,0,.34), inset 0 0 0 16px rgba(0,0,0,.28);
   animation: rouletteIdle 10s linear infinite;
 }
+.roulette-pocket-ring {
+  position: absolute;
+  inset: 7%;
+  border-radius: 50%;
+  animation: rouletteIdle 16s linear infinite reverse;
+}
+.roulette-pocket-ring b {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 28px;
+  height: 28px;
+  margin: -14px;
+  display: grid;
+  place-items: center;
+  border-radius: 50%;
+  color: #fff;
+  font-size: .68rem;
+  transform: rotate(calc(var(--p) * 9.729deg)) translateY(clamp(-160px, -16vw, -96px)) rotate(calc(var(--p) * -9.729deg));
+  box-shadow: 0 2px 8px rgba(0,0,0,.32);
+}
+.roulette-pocket-ring .red { background: #b91c1c; }
+.roulette-pocket-ring .black { background: #111827; }
+.roulette-pocket-ring .green { background: #047857; }
 .roulette-wheel span {
   width: 34%;
   aspect-ratio: 1;

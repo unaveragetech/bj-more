@@ -160,6 +160,12 @@
         gap: 14px;
       }
 
+      .guide-grid {
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 14px;
+      }
+
       .feature {
         border-top: 1px solid rgba(255, 255, 255, 0.16);
         padding-top: 12px;
@@ -200,6 +206,23 @@
 
       .step-list li + li {
         margin-top: 7px;
+      }
+
+      .tag-list {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 8px;
+        margin-top: 12px;
+      }
+
+      .tag-list span {
+        border: 1px solid rgba(250, 204, 21, 0.24);
+        border-radius: 999px;
+        padding: 6px 10px;
+        background: rgba(250, 204, 21, 0.08);
+        color: #fde68a;
+        font-size: 13px;
+        font-weight: 800;
       }
 
       .connection-map {
@@ -244,6 +267,10 @@
         .connection-map {
           grid-template-columns: 1fr;
         }
+
+        .guide-grid {
+          grid-template-columns: 1fr;
+        }
       }
     </style>
   </head>
@@ -253,11 +280,11 @@
         <div class="brand-mark"><span>21</span> Blackjack Lab</div>
         <div>
           <h1>Blackjack Lab</h1>
-          <p class="lead">A public player entry point for the live Blackjack Lab casino. The page reads the host's current connection manifest, chooses the right WebSocket server, and launches you straight into multiplayer.</p>
+          <p class="lead">A public player entry point for the live Blackjack Lab casino. Explore the slot floor, play table games, learn blackjack decisions, and connect to the host's live multiplayer room through the current manifest.</p>
         </div>
         <div class="feature-grid">
           <div class="feature"><strong>Multiplayer Slots</strong> Walk the generated casino floor, see other players, emote, inspect cabinets, and sit at games.</div>
-          <div class="feature"><strong>Blackjack Table</strong> Practice, learn strategy, and jump from table areas on the floor into blackjack play.</div>
+          <div class="feature"><strong>Table Games</strong> Practice blackjack, try roulette, run keno tickets, and move from casino tables into focused game tabs.</div>
           <div class="feature"><strong>Public Safe</strong> This repo ships only browser code. Server tokens and host config stay private.</div>
           <div class="feature"><strong>Live Connection</strong> Reads the GitHub connection branch that the host updates each time the server starts.</div>
         </div>
@@ -287,6 +314,31 @@
           <div class="guide-card">
             <h3>Where Multiplayer Matters</h3>
             <p>Multiplayer presence is centered on the slots floor: players see each other walking around, emote, gather near cabinets, and move between slot machines and blackjack table areas. Shared blackjack rooms are available from the Multiplayer tab.</p>
+          </div>
+
+          <div class="guide-grid">
+            <div class="guide-card">
+              <h3>Slot Floor Basics</h3>
+              <p>Walk with WASD, steer with the mouse, click a cabinet to inspect it, then sit to play. Cabinets can have different symbols, paylines, denoms, free-spin features, SAP jackpots, WAP jackpots, and high-limit premium rewards.</p>
+              <div class="tag-list"><span>Progressives</span><span>Free Spins</span><span>High Limit</span><span>Security</span></div>
+            </div>
+
+            <div class="guide-card">
+              <h3>Table And Number Games</h3>
+              <p>Blackjack is built for practice and review: watch the count, hand odds, dealer pressure, and model advice before acting. Roulette lets you test inside, outside, and straight-up bets. Keno supports multi-card tickets and drawn-number history.</p>
+              <div class="tag-list"><span>Blackjack</span><span>Roulette</span><span>Keno</span><span>Strategy</span></div>
+            </div>
+          </div>
+
+          <div class="guide-card">
+            <h3>Things To Try First</h3>
+            <ol class="step-list">
+              <li>Start on low-denom slots, inspect the pay table, and compare line counts before raising the bet.</li>
+              <li>Watch for linked WAP machines and SAP machines with visible jackpot chance text over the cabinet.</li>
+              <li>Use blackjack advice when a soft hand, split, double, or surrender decision is not obvious.</li>
+              <li>Try drinks carefully: they can nudge slot luck, but overdoing it can trigger a blackout or security response.</li>
+              <li>Enter high-limit rooms only when your credits support the larger base denoms and bigger swings.</li>
+            </ol>
           </div>
         </div>
 

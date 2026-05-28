@@ -5,6 +5,7 @@ let runtime = null;
 const CHUNK_SIZE = 18;
 const KEEP_RADIUS = 1;
 const DENOMS = [1, 5, 10, 25, 50, 100];
+const HIGH_LIMIT_DENOMS = [25, 50, 100, 250, 500];
 const SYMBOL_SETS = [
   ["7", "BAR", "CHERRY", "BELL", "LEMON", "PLUM", "WILD"],
   ["A", "K", "Q", "J", "10", "GEM", "CROWN", "WILD"],
@@ -474,22 +475,22 @@ function buildChunk(cx, cz) {
     runtime.machineObjects.push(object);
   }
   const machineCount = room.slots[0] + Math.floor(rng() * (room.slots[1] - room.slots[0] + 1));
-  const used = [];
-  for (let index = 0; index < machineCount; index++) {
-    let localX = 0;
-    let localZ = 0;
-    let tries = 0;
-    do {
-      localX = -7 + rng() * 14;
-      localZ = -6.5 + rng() * 12.5;
-      tries++;
-    } while (tries < 25 && (used.some((point) => Math.hypot(point.x - localX, point.z - localZ) < 2.35) || reservedByRoom(room, localX, localZ)));
-    if (cx === 0 && cz === 0 && Math.hypot(localX, localZ - 2.6) < 2.2) continue;
-    used.push({ x: localX, z: localZ });
+  const positions = machinePositionsForRoom(room, machineCount, rng, cx, cz);
+  for (let index = 0; index < positions.length; index++) {
+    const { x: localX, z: localZ, rotation = 0 } = positions[index];
     const machine = createMachineDefinition(cx, cz, index, Math.round(localX * 10), rng);
     machine.x = cx * CHUNK_SIZE + localX;
     machine.z = cz * CHUNK_SIZE + localZ;
+    machine.roomId = room.id;
+    machine.isHighLimit = room.id === "highLimit";
+    machine.baseDenoms = room.id === "highLimit" ? HIGH_LIMIT_DENOMS : DENOMS;
+    if (machine.isHighLimit) {
+      machine.maxLines = Math.max(machine.maxLines, 15);
+      machine.highLimitMultiplier = machine.progressiveType ? 1.35 : 1.2;
+      machine.theme = `High-limit ${machine.theme}`;
+    }
     const object = buildMachine(THREE, group, machine, localX, localZ);
+    object.group.rotation.y += rotation;
     machines.push(object);
     runtime.machineObjects.push(object);
   }
@@ -500,6 +501,37 @@ function buildChunk(cx, cz) {
 
   scene.add(group);
   return { group, machines, tables };
+}
+
+function machinePositionsForRoom(room, count, rng, cx, cz) {
+  const positions = [];
+  const columns = room.id === "highLimit" ? [-4.8, -1.6, 1.6, 4.8] : [-6, -3, 0, 3, 6];
+  const rows = room.id === "backbar" ? [-3.8, -1.4, 1.2, 3.8] : room.id === "sportsBook" ? [0.2, 2.8, 5.4] : [-5.5, -2.8, -0.1, 2.6, 5.3];
+  for (let r = 0; r < rows.length && positions.length < count; r++) {
+    const rowColumns = [...columns];
+    if (r % 2 === 1) rowColumns.reverse();
+    for (const col of rowColumns) {
+      if (positions.length >= count) break;
+      const jitterX = (rng() - 0.5) * 0.34;
+      const jitterZ = (rng() - 0.5) * 0.24;
+      const x = col + jitterX;
+      const z = rows[r] + jitterZ;
+      if (reservedByRoom(room, x, z)) continue;
+      if (cx === 0 && cz === 0 && Math.hypot(x, z - 2.6) < 2.4) continue;
+      if (positions.some((point) => Math.hypot(point.x - x, point.z - z) < 2.15)) continue;
+      positions.push({ x, z, rotation: r % 2 === 0 ? 0 : Math.PI });
+    }
+  }
+  let guard = 0;
+  while (positions.length < count && guard < 80) {
+    guard++;
+    const x = -6.6 + rng() * 13.2;
+    const z = -5.8 + rng() * 11.6;
+    if (reservedByRoom(room, x, z)) continue;
+    if (positions.some((point) => Math.hypot(point.x - x, point.z - z) < 2.25)) continue;
+    positions.push({ x, z, rotation: (hash(`${room.id}:${guard}`) % 5 - 2) * 0.08 });
+  }
+  return positions;
 }
 
 function roomTypeAt(cx, cz) {
@@ -529,6 +561,8 @@ function reservedByRoom(room, localX, localZ) {
   if (room.id === "sportsBook" && localZ < -2.2 && Math.abs(localX) < 6.4) return true;
   if (room.id === "cashier" && Math.hypot(localX, localZ) < 3.1) return true;
   if (room.id === "backbar" && localZ < -5.15) return true;
+  if (localZ > 4.55 && Math.abs(localX) > 4.15) return true;
+  if (room.id === "highLimit" && localZ > 3.55 && Math.abs(localX) > 3.9) return true;
   return false;
 }
 
@@ -983,12 +1017,12 @@ function patrolRouteForRoom(room, rng) {
 }
 
 function addBlackjackTables(THREE, group, rng, room, tables, cx, cz) {
-  const count = room.id === "foodCourt" ? 2 : room.id === "highLimit" ? 1 : rng() < 0.38 ? 1 : 0;
+  const count = room.id === "foodCourt" ? 2 : room.id === "highLimit" ? 1 : room.id === "club" ? 0 : rng() < 0.34 ? 1 : 0;
   const reserved = room.id === "foodCourt"
     ? [{ x: -4.8, z: -1.8 }, { x: 4.8, z: -1.8 }]
     : room.id === "highLimit"
     ? [{ x: 0, z: 4.1 }]
-    : [{ x: -5.4 + rng() * 10.8, z: 4.7 }];
+    : [{ x: -5.6, z: 6.2 }];
   for (let i = 0; i < count; i++) {
     const pos = reserved[i] || { x: -5 + rng() * 10, z: 4 + rng() * 2 };
     const table = buildBlackjackTable(THREE, group, pos.x, pos.z, room, `${cx}:${cz}:bj:${i}`);
@@ -1000,7 +1034,7 @@ function addBlackjackTables(THREE, group, rng, room, tables, cx, cz) {
 function addRouletteTables(THREE, group, rng, room, tables, cx, cz) {
   const count = room.id === "club" ? 1 : room.id === "backbar" ? 1 : room.id === "highLimit" && rng() < 0.55 ? 1 : rng() < 0.22 ? 1 : 0;
   for (let i = 0; i < count; i++) {
-    const pos = room.id === "club" ? { x: 4.9, z: 1.6 } : room.id === "backbar" ? { x: -4.8, z: 2.8 } : { x: 4.8 - rng() * 9.6, z: -1.5 + rng() * 5.2 };
+    const pos = room.id === "club" ? { x: 5.2, z: 5.6 } : room.id === "backbar" ? { x: -5.1, z: 4.9 } : room.id === "highLimit" ? { x: 4.9, z: 4.2 } : { x: 5.5, z: 5.8 };
     const table = buildRouletteTable(THREE, group, pos.x, pos.z, room, `${cx}:${cz}:rt:${i}`);
     tables.push(table);
     runtime.tableObjects.push(table);
@@ -1225,11 +1259,21 @@ function updateSecurityEscort(security, dt) {
 function updateBotPlaying(bot) {
   resetBotPose(bot);
   if (bot.timer <= 0) {
+    const roll = bot.rng();
     bot.state = "wander";
     bot.seatedMachine = null;
     bot.target = randomBotTarget(bot.rng);
     bot.timer = 2 + bot.rng() * 6;
-    if (bot.rng() > 0.55) startBotEmote(bot, bot.rng() > 0.5 ? "jackpot" : "cheer");
+    if (roll > 0.74) {
+      startBotEmote(bot, "jackpot");
+      speakBotLine(bot, bot.role?.id === "highRoller" ? "That's why I play the premium banks." : "Finally, a clean hit.", "cheer");
+    } else if (roll > 0.48) {
+      startBotEmote(bot, "cheer");
+      speakBotLine(bot, "That bonus round saved the session.", "cheer");
+    } else if (roll < 0.18) {
+      startBotEmote(bot, "think");
+      speakBotLine(bot, bot.role?.id === "tourist" ? "I swear this one was warmer a minute ago." : "Cold cabinet. Moving on.", "think");
+    }
   }
 }
 
@@ -1362,6 +1406,10 @@ function createMachineDefinition(cx, cz, row, col, rng) {
     linkedGames,
     freeSpins: 0,
     freeSpinLock: null,
+    savedDenom: 0,
+    savedLines: 0,
+    sessionCoinIn: 0,
+    sessionCoinOut: 0,
     tamperHeat: 0,
     tamperThreshold: 2 + Math.floor(rng() * 3),
     staffIncidents: 0,
@@ -1609,8 +1657,12 @@ function updateMachinePanel() {
   runtime.leaveButton.disabled = !seated;
   runtime.spinButton.disabled = !seated || runtime.spinning;
   if (runtime.rulesButton) runtime.rulesButton.disabled = false;
-  runtime.denomSelect.innerHTML = DENOMS.map((denom) => `<option value="${denom}">${denom} pts</option>`).join("");
+  const denoms = machine.baseDenoms || DENOMS;
+  runtime.denomSelect.innerHTML = denoms.map((denom) => `<option value="${denom}">${denom} pts</option>`).join("");
   runtime.paylineSelect.innerHTML = paylineOptions(machine.maxLines);
+  runtime.denomSelect.value = String(machine.savedDenom && denoms.includes(Number(machine.savedDenom)) ? machine.savedDenom : denoms[0]);
+  const lineValues = Array.from(runtime.paylineSelect.options).map((option) => Number(option.value));
+  runtime.paylineSelect.value = String(lineValues.includes(Number(machine.savedLines)) ? machine.savedLines : Math.min(machine.maxLines, lineValues.at(-1) || 1));
   runtime.machineFace.innerHTML = machineFaceMarkup(machine, null);
   updateBetReadout();
 }
@@ -1626,9 +1678,11 @@ function updateBetReadout() {
     return;
   }
   const lock = machine.freeSpins > 0 ? freeSpinLock(machine) : null;
+  machine.savedDenom = denom;
+  machine.savedLines = lines;
   runtime.betReadout.textContent = lock
     ? `${wager} pts per spin | bonus earned at ${lock.denom} x ${lock.lines} | staff heat ${machine.tamperHeat || 0}/${machine.tamperThreshold || 3}`
-    : `${wager} pts per spin`;
+    : `${wager} pts per spin | in ${chips(machine.sessionCoinIn || 0)} / out ${chips(machine.sessionCoinOut || 0)}`;
 }
 
 function spinSelected() {
@@ -1642,6 +1696,8 @@ function spinSelected() {
   }
   const denom = Number(runtime.denomSelect.value || 1);
   const lines = Math.min(Number(runtime.paylineSelect.value || 1), machine.maxLines);
+  machine.savedDenom = denom;
+  machine.savedLines = lines;
   const wager = denom * lines;
   const isFreeSpin = machine.freeSpins > 0;
   let tamperNotice = "";
@@ -1660,7 +1716,10 @@ function spinSelected() {
   runtime.spinning = true;
   runtime.spinButton.disabled = true;
   if (isFreeSpin) machine.freeSpins -= 1;
-  else runtime.commitBankroll(-wager);
+  else {
+    machine.sessionCoinIn = Number(machine.sessionCoinIn || 0) + wager;
+    runtime.commitBankroll(-wager);
+  }
   if (machine.progressiveType && !isFreeSpin) {
     machine.progressiveTotal += Math.max(1, Math.round(wager * (machine.progressiveType === "WAP" ? 0.12 : 0.08)));
   }
@@ -1676,6 +1735,7 @@ function spinSelected() {
       machine.freeSpins += result.awardedFreeSpins;
       machine.freeSpinLock = { denom, lines, wager };
     }
+    machine.sessionCoinOut = Number(machine.sessionCoinOut || 0) + result.win;
     runtime.commitBankroll(result.win);
     const luckNotice = result.luckText ? ` ${result.luckText}` : "";
     const feature = result.awardedFreeSpins ? ` Awarded ${result.awardedFreeSpins} free spins.` : result.featureText ? ` ${result.featureText}` : "";
@@ -1845,6 +1905,11 @@ function generateSpin(machine, activeLines, denom, isFreeSpin = false) {
     const linkedWin = denom * activeLines * coins * 6;
     win += linkedWin;
     featureText = `Linked respins held ${coins} coin symbols for ${chips(linkedWin)}.`;
+  }
+  if (machine.isHighLimit && win > 0) {
+    const boosted = Math.max(1, Math.round(win * (machine.highLimitMultiplier || 1.2)) - win);
+    win += boosted;
+    featureText = `${featureText} High-limit premium added ${chips(boosted)}.`.trim();
   }
   if (isFreeSpin && win > 0) {
     win = Math.round(win * 1.5);
@@ -2460,6 +2525,8 @@ function machineDetailMarkup(machine, seated) {
     <strong>${escapeHtml(machine.name)}</strong>
     <span>${escapeHtml(machine.theme)}</span>
     <span>${machine.reels} reels | up to ${machine.maxLines} paylines | ${machine.style} reels | ${machine.gameType}</span>
+    ${machine.isHighLimit ? `<span>High-limit bank: ${machine.baseDenoms.join(", ")} pt denoms | premium pays ${Math.round(((machine.highLimitMultiplier || 1.2) - 1) * 100)}% more.</span>` : ""}
+    <span>Session credits: ${chips(machine.sessionCoinIn || 0)} in / ${chips(machine.sessionCoinOut || 0)} out.</span>
     ${progressive}
     ${wap}
     <span>Free spins bank: ${machine.freeSpins || 0}${machine.freeSpinLock ? ` | earned at ${machine.freeSpinLock.denom} x ${machine.freeSpinLock.lines}` : ""}</span>
@@ -2483,10 +2550,11 @@ function machineFaceMarkup(machine, grid, spinning = false, hits = []) {
       <div class="slot-machine-title">${escapeHtml(machine.name)}</div>
       ${progressive}
       ${freeSpinChip}
+      <div class="slot-credit-chip">${chips(machine.sessionCoinOut || 0)} paid / ${chips(machine.sessionCoinIn || 0)} played</div>
       <div class="slot-reels" style="grid-template-columns:repeat(${machine.reels}, minmax(44px, 1fr))">
         ${rows.map((row, rowIndex) => row.map((symbol, reelIndex) => `<span class="${hitRows.has(`${rowIndex}:${reelIndex}`) ? "hit" : ""}" title="${escapeHtml(symbol)}">${escapeHtml(SYMBOL_ART[symbol] || symbol)}</span>`).join("")).join("")}
       </div>
-      <small>${machine.maxLines} line ${machine.volatility} variance ${machine.gameType} game</small>
+      <small>${machine.isHighLimit ? "HIGH LIMIT | " : ""}${machine.maxLines} line ${machine.volatility} variance ${machine.gameType} game</small>
     </div>
   `;
 }

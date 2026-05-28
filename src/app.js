@@ -14,7 +14,7 @@ import {
 } from "./game.js?v=6";
 import { askOllama, bankPrompt, coachPrompt, listOllamaModels, outcomePrompt, defaultBankPrompt, defaultCoachPrompt } from "./ollama.js?v=3";
 import { basicStrategy, explainStrategy, professionalStrategy } from "./strategy.js?v=4";
-import { initSlotsWorld, destroySlotsWorld, updateSlotsAvatar, updateSlotsPeers, triggerSlotsEmote } from "./slots.js?v=22";
+import { initSlotsWorld, destroySlotsWorld, updateSlotsAvatar, updateSlotsPeers, triggerSlotsEmote } from "./slots.js?v=23";
 import { loadLab, resetLab, saveLab } from "./storage.js?v=21";
 import { initNetwork, connectServer, disconnectServer, createRoom, joinRoom, leaveRoom, sendNetworkBet, sendNetworkAction, sendNetworkChat, sendNetworkAvatar, sendSlotEnter, sendSlotState, sendSlotLeave, validateServerUrl } from "./network.js?v=4";
 
@@ -828,6 +828,9 @@ function renderRoulette() {
     <section class="roulette-layout">
       <article class="roulette-wheel-card">
         <div class="roulette-wheel ${last?.color || "green"}">
+          <div class="roulette-pocket-ring">
+            ${rouletteWheelOrder().map((n, index) => `<b class="${rouletteColor(n)}" style="--p:${index}">${n}</b>`).join("")}
+          </div>
           <span>${last ? last.number : "0"}</span>
           <i></i>
         </div>
@@ -874,6 +877,10 @@ function rouletteBetOptions() {
     { id: "high", label: "19-36" },
     { id: "straight", label: "Straight number" },
   ];
+}
+
+function rouletteWheelOrder() {
+  return [0, 32, 15, 19, 4, 21, 2, 25, 17, 34, 6, 27, 13, 36, 11, 30, 8, 23, 10, 5, 24, 16, 33, 1, 20, 14, 31, 9, 22, 18, 29, 7, 28, 12, 35, 3, 26];
 }
 
 function rouletteBetDescription(type) {
@@ -1230,7 +1237,7 @@ function bindKenoActions() {
     render();
   });
   document.querySelector("#kenoClear")?.addEventListener("click", () => {
-    clearInterval(kenoTimer);
+    clearTimeout(kenoTimer);
     kenoTimer = null;
     lab.keno.animating = false;
     lab.keno.cards[lab.keno.activeCard].picks = [];
@@ -1292,9 +1299,9 @@ function drawKeno() {
 }
 
 function animateKenoDraw(draw, cardResults, wager, win) {
-  clearInterval(kenoTimer);
+  clearTimeout(kenoTimer);
   let index = 0;
-  kenoTimer = setInterval(() => {
+  const revealNext = () => {
     const number = draw[index];
     lab.keno.revealedDraw.push(number);
     const button = document.querySelector(`[data-keno="${number}"]`);
@@ -1307,16 +1314,19 @@ function animateKenoDraw(draw, cardResults, wager, win) {
     if (last) last.textContent = lab.keno.revealedDraw.join(", ");
     index += 1;
     if (index >= draw.length) {
-      clearInterval(kenoTimer);
       kenoTimer = null;
       lab.bankroll += win;
+      bankrollLabel.textContent = chips(lab.bankroll);
       lab.keno.animating = false;
       const bestHits = Math.max(...cardResults.map((card) => card.hits.length));
       lab.keno.message = `${lab.keno.cards.length} card draw complete. Best card: ${bestHits} hits. ${win ? `Won ${chips(win)}.` : `No payout. Lost ${chips(wager)}.`}`;
       saveLab(lab);
       render();
+      return;
     }
-  }, 180);
+    kenoTimer = setTimeout(revealNext, index < 5 ? 135 : index < 15 ? 165 : 210);
+  };
+  kenoTimer = setTimeout(revealNext, 140);
 }
 
 function secureSampleNumbers(max, count) {
