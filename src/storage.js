@@ -76,6 +76,8 @@ function defaultLab() {
       botConversationFrequencySeconds: 18,
       botBankrollMin: 2000,
       botBankrollMax: 10000,
+      githubAiRepo: "unaveragetech/bj-more",
+      githubAiIssueNumber: "",
     },
     ollamaModels: [],
     shoe: [],
@@ -111,6 +113,7 @@ function defaultLab() {
       loans: [],
       history: [],
       pendingOffer: null,
+      githubAiLink: "",
       trust: 50,
       trustHistory: [],
       nextEligibleAt: "",
@@ -220,6 +223,8 @@ function normalizeLab(lab) {
   lab.rules.botConversationsEnabled = lab.rules.botConversationsEnabled ?? defaults.rules.botConversationsEnabled;
   lab.rules.botConversationsUseOllama = lab.rules.botConversationsUseOllama ?? defaults.rules.botConversationsUseOllama;
   lab.rules.botConversationFrequencySeconds = Math.max(4, Number(lab.rules.botConversationFrequencySeconds || defaults.rules.botConversationFrequencySeconds));
+  lab.rules.githubAiRepo = String(lab.rules.githubAiRepo || defaults.rules.githubAiRepo);
+  lab.rules.githubAiIssueNumber = String(lab.rules.githubAiIssueNumber || defaults.rules.githubAiIssueNumber);
   if (!lab.rules.ollamaModel || lab.rules.ollamaModel === "llama3.1") {
     lab.rules.ollamaModel = defaults.rules.ollamaModel;
   }
@@ -245,6 +250,7 @@ function normalizeLab(lab) {
   lab.bank.loans ??= [];
   lab.bank.history ??= [];
   lab.bank.pendingOffer ??= null;
+  lab.bank.githubAiLink ??= "";
   lab.bank.trust ??= defaults.bank.trust;
   lab.bank.trustHistory ??= [];
   lab.drink = { ...defaults.drink, ...(lab.drink || {}) };

@@ -17,6 +17,53 @@ export async function askOllama({ url, model, prompt }) {
   return stripThinking(data.response?.trim() || "");
 }
 
+export function githubAiIssueUrl({ repo = "unaveragetech/bj-more", kind = "coach", model = "jessup", prompt, metadata = {} }) {
+  const cleanKind = String(kind || "coach").replace(/[^\w-]/g, "").slice(0, 32) || "coach";
+  const requestId = `bjlab-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+  const payload = {
+    requestId,
+    app: "blackjack-lab",
+    kind: cleanKind,
+    model: String(model || "jessup").slice(0, 80),
+    prompt: String(prompt || "").slice(0, 18000),
+    metadata,
+  };
+  const body = [
+    "Blackjack Lab AI request. The workflow will run the configured Ollama/Jessup model and comment the answer here.",
+    "",
+    "```json",
+    JSON.stringify(payload, null, 2),
+    "```",
+    "",
+    "<!-- blackjack-lab-ai-request -->",
+  ].join("\n");
+  const params = new URLSearchParams({
+    title: `[Blackjack Lab AI] ${cleanKind} ${requestId}`,
+    labels: "blackjack-lab-ai",
+    body,
+  });
+  return `https://github.com/${repo}/issues/new?${params.toString()}`;
+}
+
+export async function fetchGithubAiResponses({ repo = "unaveragetech/bj-more", issueNumber }) {
+  const number = Number(issueNumber);
+  if (!Number.isInteger(number) || number <= 0) throw new Error("Enter a valid GitHub issue number.");
+  const response = await fetch(`https://api.github.com/repos/${repo}/issues/${number}/comments`, {
+    headers: { "Accept": "application/vnd.github+json" },
+  });
+  if (!response.ok) throw new Error(`GitHub comments returned ${response.status}`);
+  const comments = await response.json();
+  return comments
+    .filter((comment) => String(comment.body || "").includes("blackjack-lab-ai-response"))
+    .map((comment) => ({
+      id: comment.id,
+      author: comment.user?.login || "github-actions",
+      createdAt: comment.created_at,
+      body: String(comment.body || "").replace(/<!-- blackjack-lab-ai-response:[^>]+-->/g, "").trim(),
+      url: comment.html_url,
+    }));
+}
+
 export async function listOllamaModels(url) {
   const response = await fetch(`${url.replace(/\/$/, "")}/api/tags`);
   if (!response.ok) throw new Error(`Ollama tags returned ${response.status}`);

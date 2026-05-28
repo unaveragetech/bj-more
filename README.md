@@ -60,6 +60,17 @@ That command pulls the `connection` branch, reads `connection.json`, starts a lo
 - Shared blackjack rooms from the Multiplayer tab.
 - Host-side surveillance showing players, rooms, games, slot presence, inputs, and reported balances.
 
+## GitHub Ollama / Jessup Bridge
+
+GitHub Pages cannot safely call a private local Ollama server, so Blackjack Lab includes an issue-based AI bridge:
+
+1. In the game, use **Ask Ollama why** or **Ask teller** as usual.
+2. If local Ollama is unavailable, the app creates a prepared GitHub issue link containing the exact coach or banker prompt.
+3. Submit the issue in this repo. The `Blackjack Lab Ollama Request` workflow installs Ollama, pulls the configured Jessup model, runs the prompt, and comments the response back on the issue.
+4. Paste the issue number into **Rules -> GitHub AI issue #** and click **Check GitHub AI response** to read the latest workflow answer.
+
+The workflow defaults to `Beelzebub4883/h-e-r-living-model:Beta`. Repo admins can set the GitHub Actions variable `BLACKJACK_LAB_OLLAMA_MODEL` to another Ollama model name if the public Jessup model changes. The browser never stores a GitHub token.
+
 ## Security Boundary
 
 This public repo must contain only static player-facing files:
@@ -70,6 +81,8 @@ This public repo must contain only static player-facing files:
 - `connection.json` fallback
 - `.nojekyll`
 - `.github/workflows/pages.yml`
+- `.github/workflows/blackjack-lab-ollama.yml`
+- `scripts/blackjack_lab_ollama.py`
 - `src/` browser assets
 - this `README.md`
 

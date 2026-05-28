@@ -12,7 +12,7 @@ import {
   startRound,
   surrender,
 } from "./game.js?v=6";
-import { askOllama, bankPrompt, coachPrompt, listOllamaModels, outcomePrompt, defaultBankPrompt, defaultCoachPrompt } from "./ollama.js?v=3";
+import { askOllama, bankPrompt, coachPrompt, listOllamaModels, outcomePrompt, defaultBankPrompt, defaultCoachPrompt, fetchGithubAiResponses, githubAiIssueUrl } from "./ollama.js?v=4";
 import { basicStrategy, explainStrategy, professionalStrategy } from "./strategy.js?v=4";
 import { initSlotsWorld, destroySlotsWorld, updateSlotsAvatar, updateSlotsPeers, triggerSlotsEmote } from "./slots.js?v=23";
 import { loadLab, resetLab, saveLab } from "./storage.js?v=21";
@@ -1391,6 +1391,7 @@ function renderBank() {
           <label>What should Jessup know? <textarea id="loanPurpose" rows="5">I need more practice funds and can repay after a few winning hands.</textarea></label>
           <button id="askTeller" class="primary">Ask teller</button>
           <p id="tellerStatus" class="fine">${escapeHtml(lab.bank.lastMessage)}</p>
+          ${lab.bank.githubAiLink ? `<p class="fine">GitHub Jessup fallback: <a href="${escapeHtml(lab.bank.githubAiLink)}" target="_blank" rel="noopener">open the prepared AI issue</a>, submit it, then paste the issue number in Rules to read the response.</p>` : ""}
         `}
       </article>
       <article class="service-panel">
@@ -1623,23 +1624,24 @@ function bindBankActions() {
     const purpose = document.querySelector("#loanPurpose").value.trim();
     const status = document.querySelector("#tellerStatus");
     status.textContent = "Jessup is reviewing the request...";
+    const activeLoans = lab.bank.loans.filter((loan) => loan.status === "active");
+    const prompt = bankPrompt({
+      amount,
+      purpose,
+      bankroll: lab.bankroll,
+      activeLoans,
+      thirst: lab.drink.thirst,
+      history: lab.bank.history,
+      policy: lab.bank.policy,
+      clock: casinoClock(),
+      loanSummary: bankLoanSummary(activeLoans),
+      promptTemplate: lab.rules.bankPrompt,
+    });
     try {
-      const activeLoans = lab.bank.loans.filter((loan) => loan.status === "active");
       const response = await askOllama({
         url: lab.rules.ollamaUrl,
         model: lab.bank.model,
-        prompt: bankPrompt({
-          amount,
-          purpose,
-          bankroll: lab.bankroll,
-          activeLoans,
-          thirst: lab.drink.thirst,
-          history: lab.bank.history,
-          policy: lab.bank.policy,
-          clock: casinoClock(),
-          loanSummary: bankLoanSummary(activeLoans),
-          promptTemplate: lab.rules.bankPrompt,
-        }),
+        prompt,
       });
       const decision = parseTellerDecision(response, amount);
       if (decision.approved) {
@@ -1650,6 +1652,13 @@ function bindBankActions() {
       render();
     } catch (error) {
       const decision = fallbackTellerDecision(amount);
+      lab.bank.githubAiLink = githubAiIssueUrl({
+        repo: lab.rules.githubAiRepo,
+        kind: "banker",
+        model: lab.bank.model || "jessup",
+        prompt,
+        metadata: { bankroll: lab.bankroll, amount, purpose, clock: casinoClock(), source: "bank" },
+      });
       applyTellerDecision(decision, `Jessup unavailable; local teller fallback used. ${error.message}`, "denied");
       render();
     }
@@ -2340,17 +2349,25 @@ function renderCoach() {
   document.querySelector("#ollamaCoach").addEventListener("click", async () => {
     const answer = document.querySelector("#ollamaAnswer");
     answer.textContent = "Asking Ollama...";
+    const prompt = coachPrompt(round, lab.rules, coachState, lab.rules.coachPrompt);
     try {
       const text = await askOllama({
         url: lab.rules.ollamaUrl,
         model: lab.rules.ollamaModel,
-        prompt: coachPrompt(round, lab.rules, coachState, lab.rules.coachPrompt),
+        prompt,
       });
       answer.textContent = text;
       lab.adviceLog.unshift({ at: new Date().toISOString(), recommendation, model: lab.rules.ollamaModel, state: coachState.visibleState, text });
       saveLab(lab);
     } catch (error) {
-      answer.textContent = `Ollama unavailable: ${error.message}`;
+      const issueUrl = githubAiIssueUrl({
+        repo: lab.rules.githubAiRepo,
+        kind: "coach",
+        model: lab.rules.ollamaModel || "jessup",
+        prompt,
+        metadata: { recommendation, visibleState: coachState.visibleState, source: "coach" },
+      });
+      answer.innerHTML = `Ollama unavailable: ${escapeHtml(error.message)} <a href="${escapeHtml(issueUrl)}" target="_blank" rel="noopener">Open a GitHub AI request</a>.`;
     }
   });
   document.querySelector("#takeAdvice").addEventListener("click", async () => {
@@ -2912,6 +2929,8 @@ function renderRules() {
           ${ollamaModelOptions()}
         </select>
       </label>
+      <label>GitHub AI repo <input data-rule="githubAiRepo" value="${escapeHtml(lab.rules.githubAiRepo || "unaveragetech/bj-more")}"></label>
+      <label>GitHub AI issue # <input data-rule="githubAiIssueNumber" value="${escapeHtml(lab.rules.githubAiIssueNumber || "")}" placeholder="Paste issue number after submitting"></label>
       <label class="full-width">Coach prompt<textarea data-rule="coachPrompt" rows="10">${escapeHtml(lab.rules.coachPrompt || defaultCoachPrompt())}</textarea></label>
       <label class="full-width">Bank teller prompt<textarea data-rule="bankPrompt" rows="10">${escapeHtml(lab.rules.bankPrompt || defaultBankPrompt())}</textarea></label>
     </section>
@@ -2919,6 +2938,7 @@ function renderRules() {
       <button id="saveRules" class="primary">Save rules and reshuffle</button>
       <button id="refreshModels">Refresh Ollama models</button>
       <button id="testOllama">Test selected model</button>
+      <button id="checkGithubAi">Check GitHub AI response</button>
     </div>
     <p id="ollamaStatus" class="fine">Installed generator models: ${lab.ollamaModels.length ? lab.ollamaModels.join(", ") : "not loaded yet"}</p>
   `;
@@ -2950,6 +2970,23 @@ function renderRules() {
       status.textContent = `Ollama OK (${document.querySelector("#ollamaModelSelect").value}): ${text}`;
     } catch (error) {
       status.textContent = `Ollama test failed: ${error.message}`;
+    }
+  });
+  document.querySelector("#checkGithubAi").addEventListener("click", async () => {
+    const status = document.querySelector("#ollamaStatus");
+    const issueNumber = app.querySelector("[data-rule='githubAiIssueNumber']")?.value || lab.rules.githubAiIssueNumber;
+    const repo = app.querySelector("[data-rule='githubAiRepo']")?.value || lab.rules.githubAiRepo;
+    status.textContent = "Checking GitHub issue comments...";
+    try {
+      const responses = await fetchGithubAiResponses({ repo, issueNumber });
+      if (!responses.length) {
+        status.textContent = "No Blackjack Lab AI response comment found yet. The GitHub Action may still be running.";
+        return;
+      }
+      const latest = responses[responses.length - 1];
+      status.innerHTML = `Latest GitHub AI response from ${escapeHtml(latest.author)}: <a href="${escapeHtml(latest.url)}" target="_blank" rel="noopener">open comment</a><br>${escapeHtml(latest.body.slice(0, 700))}`;
+    } catch (error) {
+      status.textContent = `GitHub AI check failed: ${error.message}`;
     }
   });
 }

@@ -287,6 +287,7 @@
           <div class="feature"><strong>Table Games</strong> Practice blackjack, try roulette, run keno tickets, and move from casino tables into focused game tabs.</div>
           <div class="feature"><strong>Public Safe</strong> This repo ships only browser code. Server tokens and host config stay private.</div>
           <div class="feature"><strong>Live Connection</strong> Reads the GitHub connection branch that the host updates each time the server starts.</div>
+          <div class="feature"><strong>Jessup Bridge</strong> If local Ollama is unavailable, prepared GitHub issues can trigger the public Actions workflow and return coach or banker replies.</div>
         </div>
       </section>
 
@@ -339,6 +340,11 @@
               <li>Try drinks carefully: they can nudge slot luck, but overdoing it can trigger a blackout or security response.</li>
               <li>Enter high-limit rooms only when your credits support the larger base denoms and bigger swings.</li>
             </ol>
+          </div>
+
+          <div class="guide-card">
+            <h3>AI Help From GitHub</h3>
+            <p>The mini client can use local Ollama when available. When it is not, Blackjack Lab can prepare a GitHub issue with the exact banker or coach prompt. The GitHub Action runs Ollama with the configured Jessup model and comments the answer back on that issue.</p>
           </div>
         </div>
 

@@ -1,0 +1,47 @@
+name: Blackjack Lab Ollama Request
+
+on:
+  issues:
+    types: [opened, edited, labeled]
+
+permissions:
+  contents: read
+  issues: write
+
+jobs:
+  respond:
+    if: contains(github.event.issue.title, '[Blackjack Lab AI]') || contains(join(github.event.issue.labels.*.name, ','), 'blackjack-lab-ai')
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    steps:
+      - name: Checkout public mini client
+        uses: actions/checkout@v4
+
+      - name: Install Ollama
+        run: curl -fsSL https://ollama.com/install.sh | sh
+
+      - name: Start Ollama
+        run: |
+          nohup ollama serve > /tmp/ollama.log 2>&1 &
+          for i in {1..30}; do
+            if curl -fsS http://127.0.0.1:11434/api/tags >/dev/null; then
+              exit 0
+            fi
+            sleep 1
+          done
+          cat /tmp/ollama.log
+          exit 1
+
+      - name: Pull Jessup model
+        env:
+          OLLAMA_MODEL: ${{ vars.BLACKJACK_LAB_OLLAMA_MODEL || 'Beelzebub4883/h-e-r-living-model:Beta' }}
+        run: ollama pull "$OLLAMA_MODEL"
+
+      - name: Respond to issue
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITHUB_REPOSITORY: ${{ github.repository }}
+          ISSUE_NUMBER: ${{ github.event.issue.number }}
+          OLLAMA_MODEL: ${{ vars.BLACKJACK_LAB_OLLAMA_MODEL || 'Beelzebub4883/h-e-r-living-model:Beta' }}
+        run: python scripts/blackjack_lab_ollama.py
